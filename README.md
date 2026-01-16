@@ -59,7 +59,7 @@ Traditional music streaming pays artists fractions of a cent per stream. TipTune
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/tiptune.git
+git clone https://github.com/OlufunbiIK/tip-tune/
 cd tiptune
 
 # Install dependencies
@@ -84,7 +84,7 @@ Visit `http://localhost:3000` to see TipTune in action!
 
 ---
 
-## 🎯 Quick Start
+## Quick Start
 
 ### For Listeners
 
@@ -104,29 +104,287 @@ Visit `http://localhost:3000` to see TipTune in action!
 
 ---
 
-## 🏗️ Project Structure
+## Project Structure
+
+```
+# TipTune Project Structure
 
 ```
 tiptune/
-├── frontend/
+├── frontend/                           # React + TypeScript + Vite
+│   ├── public/
+│   │   ├── favicon.ico
+│   │   ├── logo.svg
+│   │   └── assets/
 │   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── pages/          # Page components
-│   │   ├── hooks/          # Custom React hooks
-│   │   ├── utils/          # Utility functions
-│   │   └── stellar/        # Stellar integration logic
-│   └── public/             # Static assets
-├── backend/
+│   │   ├── components/                 # Reusable React components
+│   │   │   ├── common/
+│   │   │   │   ├── Button.tsx
+│   │   │   │   ├── Card.tsx
+│   │   │   │   ├── Modal.tsx
+│   │   │   │   ├── Toast.tsx
+│   │   │   │   └── LoadingSkeleton.tsx
+│   │   │   ├── layout/
+│   │   │   │   ├── Header.tsx
+│   │   │   │   ├── Footer.tsx
+│   │   │   │   ├── Sidebar.tsx
+│   │   │   │   └── Layout.tsx
+│   │   │   ├── player/
+│   │   │   │   ├── MusicPlayer.tsx
+│   │   │   │   ├── PlayButton.tsx
+│   │   │   │   ├── VolumeControl.tsx
+│   │   │   │   ├── ProgressBar.tsx
+│   │   │   │   └── TrackInfo.tsx
+│   │   │   ├── artist/
+│   │   │   │   ├── ArtistCard.tsx
+│   │   │   │   ├── ArtistProfile.tsx
+│   │   │   │   ├── ArtistHeader.tsx
+│   │   │   │   └── ArtistSearch.tsx
+│   │   │   ├── tip/
+│   │   │   │   ├── TipButton.tsx
+│   │   │   │   ├── TipModal.tsx
+│   │   │   │   ├── TipHistory.tsx
+│   │   │   │   └── TipPresets.tsx
+│   │   │   ├── wallet/
+│   │   │   │   ├── WalletConnect.tsx
+│   │   │   │   ├── WalletInfo.tsx
+│   │   │   │   └── WalletBalance.tsx
+│   │   │   └── notifications/
+│   │   │       ├── NotificationCenter.tsx
+│   │   │       ├── NotificationItem.tsx
+│   │   │       └── NotificationBell.tsx
+│   │   ├── pages/                      # Page components (routes)
+│   │   │   ├── HomePage.tsx
+│   │   │   ├── ArtistPage.tsx
+│   │   │   ├── DashboardPage.tsx
+│   │   │   ├── TipHistoryPage.tsx
+│   │   │   ├── ExplorePage.tsx
+│   │   │   └── NotFoundPage.tsx
+│   │   ├── hooks/                      # Custom React hooks
+│   │   │   ├── useWallet.ts
+│   │   │   ├── useAudio.ts
+│   │   │   ├── useTip.ts
+│   │   │   ├── useNotifications.ts
+│   │   │   ├── useWebSocket.ts
+│   │   │   └── useApi.ts
+│   │   ├── contexts/                   # React Context providers
+│   │   │   ├── WalletContext.tsx
+│   │   │   ├── PlayerContext.tsx
+│   │   │   ├── AuthContext.tsx
+│   │   │   └── NotificationContext.tsx
+│   │   ├── services/                   # API service layer
+│   │   │   ├── api.ts
+│   │   │   ├── artistService.ts
+│   │   │   ├── trackService.ts
+│   │   │   ├── tipService.ts
+│   │   │   └── userService.ts
+│   │   ├── utils/                      # Utility functions
+│   │   │   ├── stellar/
+│   │   │   │   ├── wallet.ts
+│   │   │   │   ├── payments.ts
+│   │   │   │   ├── transactions.ts
+│   │   │   │   └── addresses.ts
+│   │   │   ├── formatters.ts
+│   │   │   ├── validators.ts
+│   │   │   ├── constants.ts
+│   │   │   └── helpers.ts
+│   │   ├── types/                      # TypeScript type definitions
+│   │   │   ├── artist.types.ts
+│   │   │   ├── track.types.ts
+│   │   │   ├── tip.types.ts
+│   │   │   ├── user.types.ts
+│   │   │   ├── wallet.types.ts
+│   │   │   └── api.types.ts
+│   │   ├── styles/                     # Global styles
+│   │   │   └── global.css
+│   │   ├── App.tsx
+│   │   ├── main.tsx
+│   │   └── vite-env.d.ts
+│   ├── .env.example
+│   ├── .gitignore
+│   ├── index.html
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── vite.config.ts
+│   ├── tailwind.config.js
+│   └── postcss.config.js
+│
+├── backend/                            # NestJS + TypeORM + PostgreSQL
 │   ├── src/
-│   │   ├── routes/         # API routes
-│   │   ├── controllers/    # Request handlers
-│   │   ├── models/         # Database models
-│   │   ├── services/       # Business logic
-│   │   └── stellar/        # Stellar SDK integration
-│   └── migrations/         # Database migrations
-├── contracts/              # Soroban smart contracts
-└── docs/                   # Documentation
+│   │   ├── main.ts                     # Application entry point
+│   │   ├── app.module.ts               # Root module
+│   │   ├── app.controller.ts
+│   │   ├── app.service.ts
+│   │   │
+│   │   ├── config/                     # Configuration
+│   │   │   ├── database.config.ts
+│   │   │   ├── stellar.config.ts
+│   │   │   └── app.config.ts
+│   │   │
+│   │   ├── common/                     # Shared resources
+│   │   │   ├── decorators/
+│   │   │   │   ├── current-user.decorator.ts
+│   │   │   │   └── public.decorator.ts
+│   │   │   ├── guards/
+│   │   │   │   ├── jwt-auth.guard.ts
+│   │   │   │   └── roles.guard.ts
+│   │   │   ├── interceptors/
+│   │   │   │   ├── transform.interceptor.ts
+│   │   │   │   └── logging.interceptor.ts
+│   │   │   ├── filters/
+│   │   │   │   └── http-exception.filter.ts
+│   │   │   ├── pipes/
+│   │   │   │   └── validation.pipe.ts
+│   │   │   └── interfaces/
+│   │   │       └── response.interface.ts
+│   │   │
+│   │   ├── database/                   # Database module
+│   │   │   ├── database.module.ts
+│   │   │   └── migrations/
+│   │   │       ├── 1234567890-CreateUsers.ts
+│   │   │       ├── 1234567891-CreateArtists.ts
+│   │   │       ├── 1234567892-CreateTracks.ts
+│   │   │       └── 1234567893-CreateTips.ts
+│   │   │
+│   │   ├── auth/                       # Authentication module
+│   │   │   ├── auth.module.ts
+│   │   │   ├── auth.controller.ts
+│   │   │   ├── auth.service.ts
+│   │   │   ├── strategies/
+│   │   │   │   ├── jwt.strategy.ts
+│   │   │   │   └── wallet.strategy.ts
+│   │   │   └── dto/
+│   │   │       ├── challenge.dto.ts
+│   │   │       ├── verify-signature.dto.ts
+│   │   │       └── login.dto.ts
+│   │   │
+│   │   ├── users/                      # Users module
+│   │   │   ├── users.module.ts
+│   │   │   ├── users.controller.ts
+│   │   │   ├── users.service.ts
+│   │   │   ├── entities/
+│   │   │   │   └── user.entity.ts
+│   │   │   └── dto/
+│   │   │       ├── create-user.dto.ts
+│   │   │       └── update-user.dto.ts
+│   │   │
+│   │   ├── artists/                    # Artists module
+│   │   │   ├── artists.module.ts
+│   │   │   ├── artists.controller.ts
+│   │   │   ├── artists.service.ts
+│   │   │   ├── entities/
+│   │   │   │   └── artist.entity.ts
+│   │   │   └── dto/
+│   │   │       ├── create-artist.dto.ts
+│   │   │       └── update-artist.dto.ts
+│   │   │
+│   │   ├── tracks/                     # Tracks module
+│   │   │   ├── tracks.module.ts
+│   │   │   ├── tracks.controller.ts
+│   │   │   ├── tracks.service.ts
+│   │   │   ├── entities/
+│   │   │   │   └── track.entity.ts
+│   │   │   └── dto/
+│   │   │       ├── create-track.dto.ts
+│   │   │       └── update-track.dto.ts
+│   │   │
+│   │   ├── tips/                       # Tips module
+│   │   │   ├── tips.module.ts
+│   │   │   ├── tips.controller.ts
+│   │   │   ├── tips.service.ts
+│   │   │   ├── entities/
+│   │   │   │   └── tip.entity.ts
+│   │   │   └── dto/
+│   │   │       ├── create-tip.dto.ts
+│   │   │       └── query-tips.dto.ts
+│   │   │
+│   │   ├── stellar/                    # Stellar blockchain module
+│   │   │   ├── stellar.module.ts
+│   │   │   ├── stellar.service.ts
+│   │   │   ├── transaction-verifier.service.ts
+│   │   │   └── types/
+│   │   │       └── stellar.types.ts
+│   │   │
+│   │   ├── storage/                    # File storage module
+│   │   │   ├── storage.module.ts
+│   │   │   ├── storage.service.ts
+│   │   │   └── types/
+│   │   │       └── storage.types.ts
+│   │   │
+│   │   ├── notifications/              # Notifications module (WebSocket)
+│   │   │   ├── notifications.module.ts
+│   │   │   ├── notifications.gateway.ts
+│   │   │   ├── notifications.service.ts
+│   │   │   └── dto/
+│   │   │       └── notification.dto.ts
+│   │   │
+│   │   └── email/                      # Email module
+│   │       ├── email.module.ts
+│   │       ├── email.service.ts
+│   │       └── templates/
+│   │           └── tip-notification.html
+│   │
+│   ├── test/                           # E2E tests
+│   │   ├── app.e2e-spec.ts
+│   │   └── jest-e2e.json
+│   │
+│   ├── .env.example
+│   ├── .gitignore
+│   ├── nest-cli.json
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── tsconfig.build.json
+│   └── ormconfig.ts                    # TypeORM configuration
+│
+├── contracts/                          # Soroban smart contracts (optional)
+│   ├── tip-escrow/
+│   │   ├── src/
+│   │   │   └── lib.rs
+│   │   └── Cargo.toml
+│   └── README.md
+│
+├── docs/                               # Documentation
+│   ├── API.md
+│   ├── ARCHITECTURE.md
+│   ├── DEPLOYMENT.md
+│   ├── STELLAR_INTEGRATION.md
+│   └── DATABASE_SCHEMA.md
+│
+├── .github/                            # GitHub configuration
+│   ├── workflows/
+│   │   ├── ci.yml
+│   │   └── deploy.yml
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.md
+│   │   ├── feature_request.md
+│   │   └── drips_wave_issue.md
+│   └── PULL_REQUEST_TEMPLATE.md
+│
+├── .gitignore
+├── .env.example
+├── package.json                        # Root package.json (monorepo scripts)
+├── README.md
+├── CONTRIBUTING.md
+├── LICENSE
+└── docker-compose.yml                  # Docker setup for PostgreSQL
 ```
+
+## Key Features of This Structure:
+
+### Backend (NestJS + TypeORM + PostgreSQL)
+✅ **Module-based architecture** - Each feature is a separate module
+✅ **Entities folder** - TypeORM entities for database models
+✅ **DTOs folder** - Data Transfer Objects for validation
+✅ **Services** - Business logic separated from controllers
+✅ **Guards & Interceptors** - Authentication and request processing
+✅ **Migrations** - Database version control with TypeORM
+
+### Frontend (React + TypeScript + Vite)
+✅ **Component-based** - Organized by feature
+✅ **Contexts** - Global state management
+✅ **Services** - API calls separated from components
+✅ **Hooks** - Reusable logic
+✅ **Types** - TypeScript definitions
 
 ---
 

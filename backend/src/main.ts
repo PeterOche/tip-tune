@@ -30,6 +30,7 @@ async function bootstrap() {
     .setDescription('API for TipTune audio upload and streaming platform')
     .setVersion('1.0')
     .addTag('tracks')
+    .addTag('users')
     .build();
   
   const document = SwaggerModule.createDocument(app, config);

@@ -15,6 +15,7 @@ import { GenresModule } from './genres/genres.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { FollowsModule } from './follows/follows.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { GamificationModule } from './gamification/gamification.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     GenresModule,
     ActivitiesModule,
     FollowsModule,
+    GamificationModule,
     EventEmitterModule.forRoot(),
   ],
   controllers: [],

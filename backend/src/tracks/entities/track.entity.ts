@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { Artist } from '../../artists/entities/artist.entity';
 import { Tip } from '../../tips/entities/tip.entity';
+import { TrackGenre } from '../../genres/entities/track-genre.entity';
 
 @Entity('tracks')
 export class Track {
@@ -67,6 +68,9 @@ export class Track {
 
   @OneToMany(() => Tip, tip => tip.track)
   tips: Tip[];
+
+  @OneToMany(() => TrackGenre, (trackGenre) => trackGenre.track)
+  trackGenres: TrackGenre[];
 
   @CreateDateColumn()
   createdAt: Date;

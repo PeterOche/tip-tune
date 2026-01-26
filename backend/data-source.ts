@@ -18,7 +18,7 @@ export default new DataSource({
   username: process.env.DB_USERNAME || 'postgres',
   password: process.env.DB_PASSWORD || 'password',
   database: process.env.DB_NAME || 'tiptune',
-  synchronize: true,
+  synchronize: false,
   logging: process.env.NODE_ENV === 'development',
   entities: [path.join(__dirname, 'src/**/*.entity{.ts,.js}')],
   migrations: [path.join(__dirname, 'migrations/**/*{.ts,.js}')],

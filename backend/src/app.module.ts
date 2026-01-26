@@ -16,6 +16,7 @@ import { GenresModule } from './genres/genres.module';
 import { ActivitiesModule } from './activities/activities.module';
 import { FollowsModule } from './follows/follows.module';
 import { ScheduledReleasesModule } from './scheduled-releases/scheduled-releases.module';
+import { LeaderboardsModule } from './leaderboards/leaderboards.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { ScheduledReleasesModule } from './scheduled-releases/scheduled-releases
     ActivitiesModule,
     FollowsModule,
     ScheduledReleasesModule,
+    LeaderboardsModule,
   ],
   controllers: [],
   providers: [],

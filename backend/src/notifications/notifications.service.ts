@@ -12,6 +12,31 @@ export class NotificationsService {
     private readonly notificationsGateway: NotificationsGateway,
   ) { }
 
+  async create(createNotificationDto: {
+    userId: string;
+    type: string;
+    title: string;
+    message: string;
+    data?: any;
+  }) {
+    const notification = this.notificationRepository.create({
+      userId: createNotificationDto.userId,
+      type: createNotificationDto.type as NotificationType,
+      title: createNotificationDto.title,
+      message: createNotificationDto.message,
+      data: createNotificationDto.data,
+    });
+
+    const savedNotification = await this.notificationRepository.save(notification);
+
+    this.notificationsGateway.sendNotificationToArtist(createNotificationDto.userId, {
+      ...savedNotification,
+      type: createNotificationDto.type,
+    });
+
+    return savedNotification;
+  }
+
   async notifyArtistOfTip(artistId: string, tip: any) {
     const title = 'New Tip Received!';
     const message = `You received a tip of ${tip.amount} XLM!`;

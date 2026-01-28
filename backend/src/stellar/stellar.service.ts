@@ -21,6 +21,8 @@ export class StellarService {
     txHash: string,
     amount: string,
     recipientId: string,
+    assetCode: string = 'XLM',
+    assetIssuer?: string,
   ): Promise<boolean> {
     try {
       const tx = await this.server.transactions().transaction(txHash).call();
@@ -37,17 +39,30 @@ export class StellarService {
       const operations = await tx.operations();
 
       const paymentOp = operations.records.find(
-        (op) =>
-          op.type === 'payment' &&
-          op.to === recipientId &&
-          op.amount === amount, // Note: exact string match. 
-        // Better to use a BigNumber library or StellarSdk's handling if precision is key, 
-        // but for now string comparison matches API.
+        (op: any) => {
+          // Check type and basic fields
+          const isPayment = op.type === 'payment' || op.type === 'path_payment_strict_send' || op.type === 'path_payment_strict_receive';
+          if (!isPayment || op.to !== recipientId) return false;
+
+          // Check amount
+          if (op.amount !== amount) return false;
+
+          // Check asset
+          if (assetCode === 'XLM' || assetCode === 'native') {
+            return op.asset_type === 'native';
+          } else {
+            return (
+              (op.asset_code === assetCode && op.asset_issuer === assetIssuer) ||
+              // Handle path payments where 'to' asset matches
+              (op.asset_code === undefined && op.asset_type === 'native' && assetCode === 'XLM') // Fallback for some structures
+            );
+          }
+        }
       );
 
       if (!paymentOp) {
         this.logger.warn(
-          `Transaction ${txHash} does not contain a valid payment operation to ${recipientId} for ${amount}`,
+          `Transaction ${txHash} does not contain a valid payment operation to ${recipientId} for ${amount} ${assetCode}`,
         );
         return false;
       }
@@ -57,6 +72,28 @@ export class StellarService {
       this.logger.error(`Error verifying transaction ${txHash}: ${error.message}`);
       return false;
     }
+  }
+
+  async getConversionRate(fromAssetCode: string, toAssetCode: string, amount: number) {
+     try {
+       const fromAsset = fromAssetCode === 'XLM' ? StellarSdk.Asset.native() : new StellarSdk.Asset(fromAssetCode, 'TODO_ISSUER_LOOKUP'); // Needs issuer lookup in real implementation
+       const toAsset = toAssetCode === 'XLM' ? StellarSdk.Asset.native() : new StellarSdk.Asset(toAssetCode, 'TODO_ISSUER_LOOKUP');
+
+       // Use strict send path to find how much destination asset we get for source amount
+       const paths = await this.server.strictSendPaths(fromAsset, amount.toString(), [toAsset]).call();
+       
+       if (paths.records && paths.records.length > 0) {
+         // Return the best path's destination amount
+         return {
+           rate: parseFloat(paths.records[0].destination_amount) / amount,
+           estimatedAmount: paths.records[0].destination_amount
+         };
+       }
+       return { rate: 0, estimatedAmount: 0 };
+     } catch (error) {
+       this.logger.error(`Error fetching conversion rate: ${error.message}`);
+       return { rate: 0, estimatedAmount: 0 };
+     }
   }
 
   async getTransactionDetails(txHash: string) {

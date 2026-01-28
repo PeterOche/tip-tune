@@ -1,9 +1,15 @@
+import { Tip } from '../entities/tip.entity';
+
 export class TipVerifiedEvent {
-    constructor(
-        public readonly tipId: string,
-        public readonly senderId: string, // User ID of tipper
-        public readonly artistId: string, // Artist ID (UUID referencing Artist entity)
-        public readonly amount: number,
-        public readonly asset: string,
-    ) { }
+    public readonly tipId: string;
+    public readonly artistId: string;
+    public readonly amount: number;
+    public readonly asset: string;
+
+    constructor(public readonly tip: Tip, public readonly senderId: string) {
+        this.tipId = tip.id;
+        this.artistId = tip.artistId;
+        this.amount = tip.amount;
+        this.asset = tip.assetCode;
+    }
 }

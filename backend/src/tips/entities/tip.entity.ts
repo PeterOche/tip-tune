@@ -52,10 +52,17 @@ export class Tip {
   amount: number;
 
   @Column({ length: 20, default: "XLM" })
-  asset: string;
+  assetCode: string;
 
-  @Column({ length: 255, nullable: true })
+  @Column({ length: 56, nullable: true })
   assetIssuer?: string;
+
+  @Column({
+    type: "enum",
+    enum: ["native", "credit_alphanum4", "credit_alphanum12"],
+    default: "native",
+  })
+  assetType: string;
 
   @Column({ type: "text", nullable: true })
   message?: string;

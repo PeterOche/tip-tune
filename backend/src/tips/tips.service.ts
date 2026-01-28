@@ -18,6 +18,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ActivitiesService } from '../activities/activities.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TipVerifiedEvent } from './events/tip-verified.event';
+import { NotificationType } from '../notifications/notification.entity';
 
 @Injectable()
 export class TipsService {
@@ -81,10 +82,10 @@ export class TipsService {
     const operations = await txDetails.operations();
     // Find payment to artist
     const paymentOp: any = operations.records.find(
-      (op: any) =>
-        op.type === 'payment' &&
-        op.to === artist.walletAddress &&
-        (op.asset_type === 'native' || op.asset_code === 'USDC')
+      (op: any) => {
+        const isPayment = op.type === 'payment' || op.type === 'path_payment_strict_send' || op.type === 'path_payment_strict_receive';
+        return isPayment && op.to === artist.walletAddress;
+      }
     );
 
     if (!paymentOp) {
@@ -92,62 +93,44 @@ export class TipsService {
     }
 
     const amount = paymentOp.amount;
-    const assetCode = paymentOp.asset_type === 'native' ? 'XLM' : paymentOp.asset_code || 'UNK';
+    const assetCode = paymentOp.asset_type === 'native' ? 'XLM' : paymentOp.asset_code;
+    const assetIssuer = paymentOp.asset_issuer;
+    const assetType = paymentOp.asset_type;
 
     const user = await this.usersService.findOne(userId);
     const senderAddress = user.walletAddress;
     const receiverAddress = artist.walletAddress;
 
-    // Create Tip entity
-    const tip = this.tipRepository.create({
-      artistId: artistId,
-      senderAddress,
-      receiverAddress,
+    // 4. Create Tip record
+    const newTip = this.tipRepository.create({
+      artistId,
       trackId,
-      amount: parseFloat(amount),
       stellarTxHash,
+      senderAddress: senderAddress || 'anonymous', // Or handle if wallet missing
+      receiverAddress,
+      amount: parseFloat(amount),
+      assetCode,
+      assetIssuer,
+      assetType,
       message,
       status: TipStatus.VERIFIED,
+      verifiedAt: new Date(),
+      stellarTimestamp: new Date(txDetails.created_at),
     });
 
-    const savedTip = await this.tipRepository.save(tip);
+    const savedTip = await this.tipRepository.save(newTip);
 
-    // Emit WebSocket notification
-    this.notificationsService.notifyArtistOfTip(artistId, savedTip);
+    // 5. Emit event
+    this.eventEmitter.emit('tip.verified', new TipVerifiedEvent(savedTip, userId));
 
-    // Track activities
-    try {
-      // Track tip sent activity for the sender
-      await this.activitiesService.trackTipSent(userId, savedTip.id, {
-        amount: savedTip.amount,
-        toArtistId: artistId,
-        trackId: trackId,
-        message: message,
-      });
-
-      // Track tip received activity for the artist
-      await this.activitiesService.trackTipReceived(artistId, savedTip.id, {
-        amount: savedTip.amount,
-        fromUserId: userId,
-        trackId: trackId,
-        message: message,
-      });
-    } catch (error) {
-      // Log but don't fail tip creation if activity tracking fails
-      this.logger.warn(`Failed to track activities for tip: ${error.message}`);
-    }
-
-    // Emit TipVerifiedEvent
-    this.eventEmitter.emit(
-      'tip.verified',
-      new TipVerifiedEvent(
-        savedTip.id,
-        userId, // This is the UUID of the user context
-        artistId,
-        savedTip.amount,
-        assetCode
-      ),
-    );
+    // 6. Notify artist
+    await this.notificationsService.create({
+      userId: artistId,
+      type: NotificationType.TIP_RECEIVED,
+      title: 'New Tip Received!',
+      message: `You received a tip of ${amount} ${assetCode} from ${user.username || 'a fan'}`,
+      data: { tipId: savedTip.id, amount, assetCode },
+    });
 
     return savedTip;
   }

@@ -1,5 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import HomePage from "./pages/HomePage";
+import ExplorePage from "./pages/ExplorePage";
 import NotFoundPage from "./pages/NotFoundPage";
 import BadgesPage from "./pages/BadgesPage";
 import { LeaderboardsPage } from "./pages/LeaderboardsPage";
@@ -18,6 +19,7 @@ function App() {
       <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/explore" element={<ExplorePage />} />
           <Route path="/badges" element={<BadgesPage />} />
           <Route path="/leaderboards" element={<LeaderboardsPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />

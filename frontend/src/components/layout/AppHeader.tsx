@@ -8,6 +8,7 @@ const AppHeader: React.FC = () => {
 
   const navItems = [
     { label: 'Home', to: '/' },
+    { label: 'Explore', to: '/explore' },
     { label: 'Leaderboards', to: '/leaderboards' },
     { label: 'Dashboard', to: '/dashboard' },
     { label: 'Tip History', to: '/tips/history' },
@@ -42,8 +43,8 @@ const AppHeader: React.FC = () => {
                   key={item.to}
                   to={item.to}
                   className={`px-3 py-1.5 rounded-md transition-colors ${isActive
-                      ? 'bg-deep-slate text-white'
-                      : 'text-primary-blue hover:text-white hover:bg-primary-blue'
+                    ? 'bg-deep-slate text-white'
+                    : 'text-primary-blue hover:text-white hover:bg-primary-blue'
                     }`}
                 >
                   {item.label}
@@ -75,8 +76,8 @@ const AppHeader: React.FC = () => {
                       to={item.to}
                       onClick={closeMenu}
                       className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive
-                          ? 'bg-deep-slate text-white'
-                          : 'text-deep-slate hover:bg-gray-100'
+                        ? 'bg-deep-slate text-white'
+                        : 'text-deep-slate hover:bg-gray-100'
                         }`}
                     >
                       {item.label}

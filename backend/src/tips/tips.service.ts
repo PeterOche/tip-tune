@@ -65,7 +65,7 @@ export class TipsService {
   ) {}
 
   async create(userId: string, createTipDto: CreateTipDto): Promise<Tip> {
-    const { artistId, trackId, stellarTxHash, message, idempotencyKey } = createTipDto;
+    const { artistId, trackId, stellarTxHash, message, idempotencyKey, metadata } = createTipDto;
 
     // --- Idempotency key check: replay the original response if key already seen ---
     if (idempotencyKey) {
@@ -179,6 +179,7 @@ export class TipsService {
       status: TipStatus.VERIFIED,
       verifiedAt: new Date(),
       stellarTimestamp: new Date(txDetails.created_at),
+      metadata: metadata ? JSON.stringify(metadata) : null,
       ...(idempotencyKey ? { idempotencyKey } : {}),
     });
 

@@ -333,3 +333,242 @@ fn test_multiple_artists_independent() {
 
     assert_eq!(client.is_on_allowlist(&artist2, &tipper), false);
 }
+
+// Batch operation tests
+#[test]
+fn test_batch_add_to_allowlist() {
+    let env = setup_env();
+    let contract_id = env.register_contract(None, ArtistAllowlistContract);
+    let client = ArtistAllowlistContractClient::new(&env, &contract_id);
+
+    let artist = Address::generate(&env);
+    let tipper1 = Address::generate(&env);
+    let tipper2 = Address::generate(&env);
+    let tipper3 = Address::generate(&env);
+
+    let addresses = soroban_sdk::vec![&env, tipper1.clone(), tipper2.clone(), tipper3.clone()];
+    
+    client.add_batch_to_allowlist(&artist, &addresses);
+    
+    assert_eq!(client.is_on_allowlist(&artist, &tipper1), true);
+    assert_eq!(client.is_on_allowlist(&artist, &tipper2), true);
+    assert_eq!(client.is_on_allowlist(&artist, &tipper3), true);
+}
+
+#[test]
+fn test_batch_add_empty_fails() {
+    let env = setup_env();
+    let contract_id = env.register_contract(None, ArtistAllowlistContract);
+    let client = ArtistAllowlistContractClient::new(&env, &contract_id);
+
+    let artist = Address::generate(&env);
+    let addresses: Vec<Address> = soroban_sdk::vec![&env];
+
+    let result = client.try_add_batch_to_allowlist(&artist, &addresses);
+    assert_eq!(result, Err(Ok(Error::EmptyBatchOperation)));
+}
+
+#[test]
+fn test_batch_add_with_duplicate_in_batch_fails() {
+    let env = setup_env();
+    let contract_id = env.register_contract(None, ArtistAllowlistContract);
+    let client = ArtistAllowlistContractClient::new(&env, &contract_id);
+
+    let artist = Address::generate(&env);
+    let tipper = Address::generate(&env);
+
+    let addresses = soroban_sdk::vec![&env, tipper.clone(), tipper.clone()];
+    
+    let result = client.try_add_batch_to_allowlist(&artist, &addresses);
+    assert_eq!(result, Err(Ok(Error::AlreadyOnAllowlist)));
+}
+
+#[test]
+fn test_batch_add_with_existing_member_fails() {
+    let env = setup_env();
+    let contract_id = env.register_contract(None, ArtistAllowlistContract);
+    let client = ArtistAllowlistContractClient::new(&env, &contract_id);
+
+    let artist = Address::generate(&env);
+    let tipper1 = Address::generate(&env);
+    let tipper2 = Address::generate(&env);
+    let tipper3 = Address::generate(&env);
+
+    // Add first member
+    client.add_to_allowlist(&artist, &tipper1);
+
+    // Try to batch add including already-existing member (atomicity check)
+    let addresses = soroban_sdk::vec![&env, tipper2.clone(), tipper1.clone(), tipper3.clone()];
+    
+    let result = client.try_add_batch_to_allowlist(&artist, &addresses);
+    assert_eq!(result, Err(Ok(Error::AlreadyOnAllowlist)));
+    
+    // Verify atomicity: tipper2 and tipper3 should NOT have been added
+    assert_eq!(client.is_on_allowlist(&artist, &tipper2), false);
+    assert_eq!(client.is_on_allowlist(&artist, &tipper3), false);
+}
+
+#[test]
+fn test_batch_remove_from_allowlist() {
+    let env = setup_env();
+    let contract_id = env.register_contract(None, ArtistAllowlistContract);
+    let client = ArtistAllowlistContractClient::new(&env, &contract_id);
+
+    let artist = Address::generate(&env);
+    let tipper1 = Address::generate(&env);
+    let tipper2 = Address::generate(&env);
+    let tipper3 = Address::generate(&env);
+
+    // Add all
+    let addresses = soroban_sdk::vec![&env, tipper1.clone(), tipper2.clone(), tipper3.clone()];
+    client.add_batch_to_allowlist(&artist, &addresses);
+
+    // Remove some
+    let remove_addresses = soroban_sdk::vec![&env, tipper1.clone(), tipper3.clone()];
+    client.remove_batch_from_allowlist(&artist, &remove_addresses);
+
+    assert_eq!(client.is_on_allowlist(&artist, &tipper1), false);
+    assert_eq!(client.is_on_allowlist(&artist, &tipper2), true);
+    assert_eq!(client.is_on_allowlist(&artist, &tipper3), false);
+}
+
+#[test]
+fn test_batch_remove_empty_fails() {
+    let env = setup_env();
+    let contract_id = env.register_contract(None, ArtistAllowlistContract);
+    let client = ArtistAllowlistContractClient::new(&env, &contract_id);
+
+    let artist = Address::generate(&env);
+    let addresses: Vec<Address> = soroban_sdk::vec![&env];
+
+    let result = client.try_remove_batch_from_allowlist(&artist, &addresses);
+    assert_eq!(result, Err(Ok(Error::EmptyBatchOperation)));
+}
+
+#[test]
+fn test_batch_remove_nonexistent_fails() {
+    let env = setup_env();
+    let contract_id = env.register_contract(None, ArtistAllowlistContract);
+    let client = ArtistAllowlistContractClient::new(&env, &contract_id);
+
+    let artist = Address::generate(&env);
+    let tipper1 = Address::generate(&env);
+    let tipper2 = Address::generate(&env);
+
+    let addresses = soroban_sdk::vec![&env, tipper1.clone(), tipper2.clone()];
+    
+    let result = client.try_remove_batch_from_allowlist(&artist, &addresses);
+    assert_eq!(result, Err(Ok(Error::NotOnAllowlist)));
+}
+
+#[test]
+fn test_batch_remove_partial_atomicity() {
+    let env = setup_env();
+    let contract_id = env.register_contract(None, ArtistAllowlistContract);
+    let client = ArtistAllowlistContractClient::new(&env, &contract_id);
+
+    let artist = Address::generate(&env);
+    let tipper1 = Address::generate(&env);
+    let tipper2 = Address::generate(&env);
+    let tipper3 = Address::generate(&env);
+
+    // Add tipper1 and tipper2
+    let add_addresses = soroban_sdk::vec![&env, tipper1.clone(), tipper2.clone()];
+    client.add_batch_to_allowlist(&artist, &add_addresses);
+
+    // Try to batch remove including non-existent member (atomicity check)
+    let remove_addresses = soroban_sdk::vec![&env, tipper1.clone(), tipper3.clone()];
+    
+    let result = client.try_remove_batch_from_allowlist(&artist, &remove_addresses);
+    assert_eq!(result, Err(Ok(Error::NotOnAllowlist)));
+    
+    // Verify atomicity: tipper1 should still be there
+    assert_eq!(client.is_on_allowlist(&artist, &tipper1), true);
+    assert_eq!(client.is_on_allowlist(&artist, &tipper2), true);
+}
+
+// Token gate hardening tests
+#[test]
+fn test_get_token_gate_found() {
+    let env = setup_env();
+    let contract_id = env.register_contract(None, ArtistAllowlistContract);
+    let client = ArtistAllowlistContractClient::new(&env, &contract_id);
+
+    let artist = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+
+    let token_contract = env.register_stellar_asset_contract_v2(token_admin.clone());
+    let token_address = token_contract.address();
+
+    client.set_allowlist_mode(&artist, &AllowlistMode::TokenGated);
+    client.set_token_gate(&artist, &token_address, &1000);
+
+    let gate = client.get_token_gate(&artist);
+    assert_eq!(gate.token_address, token_address);
+    assert_eq!(gate.min_balance, 1000);
+}
+
+#[test]
+fn test_get_token_gate_not_found() {
+    let env = setup_env();
+    let contract_id = env.register_contract(None, ArtistAllowlistContract);
+    let client = ArtistAllowlistContractClient::new(&env, &contract_id);
+
+    let artist = Address::generate(&env);
+
+    let result = client.try_get_token_gate(&artist);
+    assert_eq!(result, Err(Ok(Error::TokenGateNotFound)));
+}
+
+#[test]
+fn test_token_gate_validation_with_valid_token() {
+    let env = setup_env();
+    let contract_id = env.register_contract(None, ArtistAllowlistContract);
+    let client = ArtistAllowlistContractClient::new(&env, &contract_id);
+
+    let artist = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+
+    // Create a valid stellar asset token
+    let token_contract = env.register_stellar_asset_contract_v2(token_admin.clone());
+    let token_address = token_contract.address();
+
+    // Should succeed with valid token
+    let result = client.try_set_token_gate(&artist, &token_address, &1000);
+    assert_eq!(result, Ok(Ok(())));
+}
+
+#[test]
+fn test_batch_add_then_remove_workflow() {
+    let env = setup_env();
+    let contract_id = env.register_contract(None, ArtistAllowlistContract);
+    let client = ArtistAllowlistContractClient::new(&env, &contract_id);
+
+    let artist = Address::generate(&env);
+    let tipper1 = Address::generate(&env);
+    let tipper2 = Address::generate(&env);
+    let tipper3 = Address::generate(&env);
+    let tipper4 = Address::generate(&env);
+
+    client.set_allowlist_mode(&artist, &AllowlistMode::AllowlistOnly);
+
+    // Batch add 4 tippers
+    let add_addresses = soroban_sdk::vec![&env, tipper1.clone(), tipper2.clone(), tipper3.clone(), tipper4.clone()];
+    client.add_batch_to_allowlist(&artist, &add_addresses);
+
+    // All should be able to tip
+    assert_eq!(client.check_can_tip(&artist, &tipper1), true);
+    assert_eq!(client.check_can_tip(&artist, &tipper2), true);
+    assert_eq!(client.check_can_tip(&artist, &tipper3), true);
+    assert_eq!(client.check_can_tip(&artist, &tipper4), true);
+
+    // Batch remove 2 tippers
+    let remove_addresses = soroban_sdk::vec![&env, tipper2.clone(), tipper4.clone()];
+    client.remove_batch_from_allowlist(&artist, &remove_addresses);
+
+    // Check can tip results
+    assert_eq!(client.check_can_tip(&artist, &tipper1), true);
+    assert_eq!(client.check_can_tip(&artist, &tipper2), false);
+    assert_eq!(client.check_can_tip(&artist, &tipper3), true);
+    assert_eq!(client.check_can_tip(&artist, &tipper4), false);
+}

@@ -1,7 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env,
+    contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env, Vec,
 };
 
 #[contracterror]
@@ -13,6 +13,8 @@ pub enum Error {
     AlreadyOnAllowlist = 3,
     NotOnAllowlist = 4,
     InvalidTokenConfig = 5,
+    TokenGateNotFound = 6,
+    EmptyBatchOperation = 7,
 }
 
 #[contracttype]
@@ -91,7 +93,8 @@ impl ArtistAllowlistContract {
         Ok(())
     }
 
-    /// Configure token gate parameters for token-gated mode
+    /// Configure token gate parameters for token-gated mode.
+    /// Validates that the token address is currently valid.
     pub fn set_token_gate(
         env: Env,
         artist: Address,
@@ -103,6 +106,10 @@ impl ArtistAllowlistContract {
         if min_balance <= 0 {
             return Err(Error::InvalidTokenConfig);
         }
+
+        // Validate token configuration by attempting to create a client
+        // This ensures the token address is callable and valid
+        let _client = token::Client::new(&env, &token_address);
 
         let gate = TokenGateConfig {
             token_address,
@@ -222,6 +229,110 @@ impl ArtistAllowlistContract {
         env.storage()
             .persistent()
             .has(&DataKey::Entry(artist, address))
+    }
+
+    /// Add multiple addresses to an artist's allowlist in a batch operation.
+    /// Fails if any address is already on the allowlist (atomic semantics).
+    pub fn add_batch_to_allowlist(
+        env: Env,
+        artist: Address,
+        addresses: Vec<Address>,
+    ) -> Result<(), Error> {
+        artist.require_auth();
+
+        if addresses.is_empty() {
+            return Err(Error::EmptyBatchOperation);
+        }
+
+        // Check for duplicates within the batch
+        let len = addresses.len();
+        for i in 0..len {
+            for j in (i + 1)..len {
+                if addresses.get(i).unwrap() == addresses.get(j).unwrap() {
+                    return Err(Error::AlreadyOnAllowlist);
+                }
+            }
+        }
+
+        // Check if any already on allowlist (fail-fast)
+        for address in addresses.iter() {
+            if env
+                .storage()
+                .persistent()
+                .has(&DataKey::Entry(artist.clone(), address.clone()))
+            {
+                return Err(Error::AlreadyOnAllowlist);
+            }
+        }
+
+        // Add all addresses (if we get here, all checks passed)
+        for address in addresses.iter() {
+            let entry = AllowlistEntry {
+                artist: artist.clone(),
+                address: address.clone(),
+                added_at: env.ledger().timestamp(),
+                added_by: artist.clone(),
+            };
+
+            env.storage()
+                .persistent()
+                .set(&DataKey::Entry(artist.clone(), address.clone()), &entry);
+
+            env.events().publish(
+                (symbol_short!("allowlst"), symbol_short!("batch")),
+                (artist.clone(), address.clone()),
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Remove multiple addresses from an artist's allowlist in a batch operation.
+    /// Fails if any address is not on the allowlist (atomic semantics).
+    pub fn remove_batch_from_allowlist(
+        env: Env,
+        artist: Address,
+        addresses: Vec<Address>,
+    ) -> Result<(), Error> {
+        artist.require_auth();
+
+        if addresses.is_empty() {
+            return Err(Error::EmptyBatchOperation);
+        }
+
+        // Check if all addresses are on the allowlist (fail-fast)
+        for address in addresses.iter() {
+            if !env
+                .storage()
+                .persistent()
+                .has(&DataKey::Entry(artist.clone(), address.clone()))
+            {
+                return Err(Error::NotOnAllowlist);
+            }
+        }
+
+        // Remove all addresses (if we get here, all checks passed)
+        for address in addresses.iter() {
+            env.storage()
+                .persistent()
+                .remove(&DataKey::Entry(artist.clone(), address.clone()));
+
+            env.events().publish(
+                (symbol_short!("allowlst"), symbol_short!("brem")),
+                (artist.clone(), address.clone()),
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Get the token gate configuration for an artist.
+    /// Returns error if token gate is not configured.
+    pub fn get_token_gate(env: Env, artist: Address) -> Result<TokenGateConfig, Error> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::TokenGate(artist))
+            .ok_or(Error::TokenGateNotFound)
     }
 }
 

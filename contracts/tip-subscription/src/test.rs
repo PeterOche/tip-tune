@@ -16,10 +16,10 @@ fn setup_test() -> (
     token::StellarAssetClient<'static>,
 ) {
     let env = Env::default();
-    
-    // FIXED: This allows tests to process nested token transfers 
+
+    // FIXED: This allows tests to process nested token transfers
     // where the subscriber is not the root invoker of the contract call.
-    env.mock_all_auths_allowing_non_root_auth(); 
+    env.mock_all_auths_allowing_non_root_auth();
 
     let contract_id = env.register_contract(None, TipSubscriptionContract);
     let client = TipSubscriptionContractClient::new(&env, &contract_id);
@@ -71,7 +71,10 @@ fn test_create_and_process_subscription() {
 
     client.process_payment(&sub_id);
 
-    assert_eq!(token_client.balance(&artist), initial_artist_balance + amount);
+    assert_eq!(
+        token_client.balance(&artist),
+        initial_artist_balance + amount
+    );
     assert_eq!(
         token_client.balance(&subscriber),
         initial_subscriber_balance - amount
@@ -80,7 +83,7 @@ fn test_create_and_process_subscription() {
 
 // FIXED: Added the `#` to match Soroban's new custom error output formatting
 #[test]
-#[should_panic(expected = "Error(Contract, #4)")] 
+#[should_panic(expected = "Error(Contract, #4)")]
 fn test_payment_too_early() {
     let (_, client, subscriber, artist, token_client, _) = setup_test();
 
@@ -108,11 +111,20 @@ fn test_lifecycle_pause_resume_cancel() {
     );
 
     client.pause_subscription(&sub_id);
-    assert_eq!(client.get_subscription(&sub_id).status, SubscriptionStatus::Paused);
+    assert_eq!(
+        client.get_subscription(&sub_id).status,
+        SubscriptionStatus::Paused
+    );
 
     client.resume_subscription(&sub_id);
-    assert_eq!(client.get_subscription(&sub_id).status, SubscriptionStatus::Active);
+    assert_eq!(
+        client.get_subscription(&sub_id).status,
+        SubscriptionStatus::Active
+    );
 
     client.cancel_subscription(&sub_id);
-    assert_eq!(client.get_subscription(&sub_id).status, SubscriptionStatus::Cancelled);
+    assert_eq!(
+        client.get_subscription(&sub_id).status,
+        SubscriptionStatus::Cancelled
+    );
 }

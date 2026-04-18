@@ -1,67 +1,22 @@
-use soroban_sdk::{Address, Env, symbol_short, Symbol};
+use soroban_sdk::{symbol_short, Address, Env, String};
 
-pub fn emit_pool_created(
-    env: &Env,
-    pool_id: &Vec<u8>,
-    sponsor: &Address,
-    artist: &Address,
-    pool_amount: i128,
-    match_ratio: u32,
-    match_cap_total: i128,
-    end_time: u64,
-) {
+pub fn emit_pool_created(env: &Env, pool_id: &String) {
     env.events().publish(
-        (symbol_short!("pool"), symbol_short!("created")),
-        (pool_id, sponsor, artist, pool_amount, match_ratio, match_cap_total, end_time),
+        (symbol_short!("pool"), symbol_short!("create")),
+        pool_id.clone(),
     );
 }
 
-pub fn emit_tip_matched(
-    env: &Env,
-    pool_id: &Vec<u8>,
-    tipper: &Address,
-    tip_amount: i128,
-    matched_amount: i128,
-    total_matched: i128,
-) {
+pub fn emit_tip_matched(env: &Env, pool_id: &String, tipper: &Address, amount: i128) {
     env.events().publish(
-        (symbol_short!("pool"), symbol_short!("matched")),
-        (pool_id, tipper, tip_amount, matched_amount, total_matched),
+        (symbol_short!("tip"), symbol_short!("match")),
+        (pool_id.clone(), tipper.clone(), amount),
     );
 }
 
-pub fn emit_pool_depleted(
-    env: &Env,
-    pool_id: &Vec<u8>,
-    reason: Symbol,
-    total_matched: i128,
-) {
+pub fn emit_pool_cancelled(env: &Env, pool_id: &String, refunded_amount: i128) {
     env.events().publish(
-        (symbol_short!("pool"), symbol_short!("depleted")),
-        (pool_id, reason, total_matched),
-    );
-}
-
-pub fn emit_pool_cancelled(
-    env: &Env,
-    pool_id: &Vec<u8>,
-    refunded_amount: i128,
-    total_matched: i128,
-) {
-    env.events().publish(
-        (symbol_short!("pool"), symbol_short!("cancelled")),
-        (pool_id, refunded_amount, total_matched),
-    );
-}
-
-pub fn emit_pool_closed(
-    env: &Env,
-    pool_id: &Vec<u8>,
-    reason: Symbol,
-    total_matched: i128,
-) {
-    env.events().publish(
-        (symbol_short!("pool"), symbol_short!("closed")),
-        (pool_id, reason, total_matched),
+        (symbol_short!("pool"), symbol_short!("cancel")),
+        (pool_id.clone(), refunded_amount),
     );
 }

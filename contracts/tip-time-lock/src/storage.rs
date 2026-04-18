@@ -1,5 +1,5 @@
-use soroban_sdk::{Address, Env, String, Vec};
 use crate::types::{DataKey, TimeLockTip};
+use soroban_sdk::{Address, Env, String, Vec};
 
 pub fn save_tip(env: &Env, lock_id: String, tip: &TimeLockTip) {
     let key = DataKey::Tip(lock_id.clone());
@@ -7,7 +7,11 @@ pub fn save_tip(env: &Env, lock_id: String, tip: &TimeLockTip) {
 
     // Update list of artist tips
     let artist_key = DataKey::ArtistTips(tip.artist.clone());
-    let mut tips: Vec<String> = env.storage().persistent().get(&artist_key).unwrap_or(Vec::new(env));
+    let mut tips: Vec<String> = env
+        .storage()
+        .persistent()
+        .get(&artist_key)
+        .unwrap_or(Vec::new(env));
     tips.push_back(lock_id);
     env.storage().persistent().set(&artist_key, &tips);
 }
@@ -24,7 +28,10 @@ pub fn update_tip(env: &Env, tip: &TimeLockTip) {
 
 pub fn get_artist_tips(env: &Env, artist: Address) -> Vec<String> {
     let artist_key = DataKey::ArtistTips(artist);
-    env.storage().persistent().get(&artist_key).unwrap_or(Vec::new(env))
+    env.storage()
+        .persistent()
+        .get(&artist_key)
+        .unwrap_or(Vec::new(env))
 }
 
 pub fn increment_counter(env: &Env) -> u32 {

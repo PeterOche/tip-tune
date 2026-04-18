@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(clippy::too_many_arguments)]
 
 mod storage;
 mod types;
@@ -6,7 +7,9 @@ mod types;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contract, contractimpl, symbol_short, token, Address, Env, String, Vec};
+use soroban_sdk::{
+    contract, contractimpl, contracttype, symbol_short, token, Address, Env, String, Vec,
+};
 use types::{Asset, Error, TimeLockStatus, TimeLockTip};
 
 #[contracttype]
@@ -73,11 +76,17 @@ impl TimeLockContract {
         tipper.require_auth();
 
         // Replay protection: check and update actor nonce
-        let last_nonce: u64 = env.storage().instance().get(&types::DataKey::ActorNonce(tipper.clone())).unwrap_or(0);
+        let last_nonce: u64 = env
+            .storage()
+            .instance()
+            .get(&types::DataKey::ActorNonce(tipper.clone()))
+            .unwrap_or(0);
         if nonce <= last_nonce {
             return Err(Error::InvalidNonce);
         }
-        env.storage().instance().set(&types::DataKey::ActorNonce(tipper.clone()), &nonce);
+        env.storage()
+            .instance()
+            .set(&types::DataKey::ActorNonce(tipper.clone()), &nonce);
 
         if amount <= 0 {
             return Err(Error::InvalidAmount);
@@ -93,7 +102,7 @@ impl TimeLockContract {
         token_client.transfer(&tipper, &env.current_contract_address(), &amount);
 
         let counter = storage::increment_counter(&env);
-        
+
         // Generate lock_id (simple string conversion of counter)
         let mut buf = [0u8; 10];
         let mut i = 10;
@@ -155,11 +164,17 @@ impl TimeLockContract {
         artist.require_auth();
 
         // Replay protection: check and update actor nonce
-        let last_nonce: u64 = env.storage().instance().get(&types::DataKey::ActorNonce(artist.clone())).unwrap_or(0);
+        let last_nonce: u64 = env
+            .storage()
+            .instance()
+            .get(&types::DataKey::ActorNonce(artist.clone()))
+            .unwrap_or(0);
         if nonce <= last_nonce {
             return Err(Error::InvalidNonce);
         }
-        env.storage().instance().set(&types::DataKey::ActorNonce(artist.clone()), &nonce);
+        env.storage()
+            .instance()
+            .set(&types::DataKey::ActorNonce(artist.clone()), &nonce);
 
         let mut tip = storage::get_tip(&env, lock_id).ok_or(Error::LockNotFound)?;
 
@@ -208,20 +223,21 @@ impl TimeLockContract {
         Ok(tip.amount)
     }
 
-    pub fn refund_tip(
-        env: Env,
-        lock_id: String,
-        tipper: Address,
-        nonce: u64,
-    ) -> Result<(), Error> {
+    pub fn refund_tip(env: Env, lock_id: String, tipper: Address, nonce: u64) -> Result<(), Error> {
         tipper.require_auth();
 
         // Replay protection: check and update actor nonce
-        let last_nonce: u64 = env.storage().instance().get(&types::DataKey::ActorNonce(tipper.clone())).unwrap_or(0);
+        let last_nonce: u64 = env
+            .storage()
+            .instance()
+            .get(&types::DataKey::ActorNonce(tipper.clone()))
+            .unwrap_or(0);
         if nonce <= last_nonce {
             return Err(Error::InvalidNonce);
         }
-        env.storage().instance().set(&types::DataKey::ActorNonce(tipper.clone()), &nonce);
+        env.storage()
+            .instance()
+            .set(&types::DataKey::ActorNonce(tipper.clone()), &nonce);
 
         let mut tip = storage::get_tip(&env, lock_id).ok_or(Error::LockNotFound)?;
 
@@ -272,10 +288,7 @@ impl TimeLockContract {
         Ok(())
     }
 
-    pub fn get_pending_tips(
-        env: Env,
-        artist: Address,
-    ) -> Vec<TimeLockTip> {
+    pub fn get_pending_tips(env: Env, artist: Address) -> Vec<TimeLockTip> {
         let tip_ids = storage::get_artist_tips(&env, artist);
         let mut pending = Vec::new(&env);
         for lock_id in tip_ids.iter() {

@@ -80,7 +80,7 @@ export class PayoutReconciliationService {
 
     const discrepancies: PayoutReconciliationResult[] = [];
 
-    if (Math.abs(expectedAvailableXLM - actualAvailableXLM) > 0.000001 || Math.abs(expectedPendingXLM - actualPendingXLM) > 0.000001) {
+    if (Math.abs(expectedAvailableXLM - actualAvailableXLM) > 0.000001 || Math.abs(pendingXLM - actualPendingXLM) > 0.000001) {
       discrepancies.push({
         artistId,
         assetCode: 'XLM',
@@ -93,7 +93,7 @@ export class PayoutReconciliationService {
       });
     }
 
-    if (Math.abs(expectedAvailableUSDC - actualAvailableUSDC) > 0.000001 || Math.abs(expectedPendingUSDC - actualPendingUSDC) > 0.000001) {
+    if (Math.abs(expectedAvailableUSDC - actualAvailableUSDC) > 0.000001 || Math.abs(pendingUSDC - actualPendingUSDC) > 0.000001) {
       discrepancies.push({
         artistId,
         assetCode: 'USDC',

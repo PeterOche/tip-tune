@@ -18,10 +18,8 @@ import type {
     Network,
     EnhancedWalletState,
     EnhancedWalletContextType,
-    WalletErrorCode,
-    WalletConnectionState,
 } from "../types/wallet";
-import { WalletError } from "../types/wallet";
+import { WalletError, WalletErrorCode } from "../types/wallet";
 import {
     getServer,
     getNetworkPassphrase,
@@ -36,160 +34,81 @@ interface WalletProviderProps {
 
 const WalletContext = createContext<EnhancedWalletContextType | null>(null);
 
+const createDisconnectedState = (
+    network: Network,
+): EnhancedWalletState => ({
+    connectionState: "disconnected",
+    isConnected: false,
+    isConnecting: false,
+    publicKey: null,
+    network,
+    balance: null,
+    error: null,
+    lastError: undefined,
+    connectionStatus: {
+        state: "disconnected",
+        error: "Connect your wallet to get started",
+        canRetry: false,
+    },
+});
+
 export const WalletProvider: React.FC<WalletProviderProps> = ({
     children,
     defaultNetwork = "testnet",
 }) => {
-    const [state, setState] = useState<EnhancedWalletState>({
-        connectionState: "disconnected",
-        isConnected: false,
-        isConnecting: false,
-        publicKey: null,
-        network: defaultNetwork,
-        balance: null,
-        error: null,
-        lastError: undefined,
-        connectionStatus: {
-            state: "disconnected",
-            error: "Connect your wallet to get started",
-            canRetry: false,
-        },
-    });
+    const [state, setState] = useState<EnhancedWalletState>(
+        createDisconnectedState(defaultNetwork),
+    );
 
-    // Update connection status whenever relevant state changes
-    useEffect(() => {
-        const connectionStatus = WalletStateManager.getConnectionStatus(
+    const setLastError = useCallback((error?: WalletError) => {
+        setState((prev) => ({
+            ...prev,
+            lastError: error
+                ? {
+                      code: error.code,
+                      message: error.message,
+                      timestamp: Date.now(),
+                  }
+                : undefined,
+        }));
+    }, []);
+
+    const clearError = useCallback(() => {
+        setState((prev) => ({
+            ...prev,
+            error: null,
+            lastError: undefined,
+        }));
+    }, []);
+
+    const getConnectionStatus = useCallback(() => {
+        return WalletStateManager.getConnectionStatus(
             state.isConnected,
             state.isConnecting,
             state.error,
             state.lastError,
         );
+    }, [state.isConnected, state.isConnecting, state.error, state.lastError]);
 
-        setState((prev) => ({
-            ...prev,
-            connectionStatus: {
-                ...connectionStatus,
-                retryAction: connectionStatus.canRetry
-                    ? retryConnection
-                    : undefined,
-            },
-        }));
-    }, [
-        state.isConnected,
-        state.isConnecting,
-        state.error,
-        state.lastError,
-        retryConnection,
-    ]);
-
-    // Update connection state based on current state
-    useEffect(() => {
-        let newConnectionState: WalletConnectionState;
-
-        if (state.isConnecting) {
-            newConnectionState = "connecting";
-        } else if (state.isConnected) {
-            newConnectionState = "connected";
-        } else if (state.error && state.lastError) {
-            newConnectionState = WalletStateManager.getConnectionStatus(
-                state.isConnected,
-                state.isConnecting,
-                state.error,
-                state.lastError,
-            ).state;
-        } else {
-            newConnectionState = "disconnected";
-        }
-
-        if (newConnectionState !== state.connectionState) {
-            setState((prev) => ({
-                ...prev,
-                connectionState: newConnectionState,
-            }));
-        }
-    }, [
-        state.isConnected,
-        state.isConnecting,
-        state.error,
-        state.lastError,
-        state.connectionState,
-    ]);
-
-    // Check if Freighter is installed
     const checkFreighterInstalled = useCallback(async (): Promise<boolean> => {
         try {
-            // Try to access Freighter API
-            if (typeof window !== "undefined" && (window as any).freighterApi) {
+            if (
+                typeof window !== "undefined" &&
+                "freighterApi" in window &&
+                (window as Window & { freighterApi?: unknown }).freighterApi
+            ) {
                 return true;
             }
-            // Fallback: try to call isConnected
+
             await isConnected();
             return true;
-    // Initialize wallet connection on mount
-    useEffect(() => {
-        const initializeWallet = async () => {
-            try {
-                const installed = await checkFreighterInstalled();
-                if (!installed) {
-                    return;
-                }
+        } catch {
+            return false;
+        }
+    }, []);
 
-                const connected = await isConnected();
-                if (connected) {
-                    const { address } = await getAddress();
-                    const publicKey = address;
-
-                    // Validate publicKey before proceeding
-                    if (!publicKey || publicKey.trim() === "") {
-                        console.debug(
-                            "Connected but no valid address returned",
-                        );
-                        return;
-                    }
-
-                    let network: Network = defaultNetwork;
-
-                    try {
-                        const { network: freighterNetwork } =
-                            await getNetwork();
-                        // Map Freighter network to our Network type
-                        if (freighterNetwork === "PUBLIC") {
-                            network = "mainnet";
-                        } else if (freighterNetwork === "TESTNET") {
-                            network = "testnet";
-                        } else {
-                            network = defaultNetwork;
-                        }
-                    } catch {
-                        // If getNetwork fails, use default
-                        network = defaultNetwork;
-                    }
-
-                    setState((prev) => ({
-                        ...prev,
-                        isConnected: true,
-                        publicKey,
-                        network,
-                        error: null,
-                        lastError: undefined,
-                    }));
-
-                    // Fetch balance
-                    await fetchBalance(publicKey, network);
-                }
-            } catch (error) {
-                // Silently fail initialization - wallet might not be connected
-                console.debug("Wallet not connected on initialization:", error);
-            }
-        };
-
-        initializeWallet();
-    }, [defaultNetwork, checkFreighterInstalled]);
-
-    // Fetch balance for a given address and network
     const fetchBalance = useCallback(
         async (publicKey: string, network: Network) => {
-            // Validate publicKey before making request
             if (!publicKey || publicKey.trim() === "") {
                 console.debug("Cannot fetch balance: no valid publicKey");
                 return;
@@ -198,22 +117,20 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
             try {
                 const server = getServer(network);
                 const account = await server.loadAccount(publicKey);
-
-                // Find XLM balance
                 const xlmBalance = account.balances.find(
                     (balance) => balance.asset_type === "native",
                 );
 
-                if (xlmBalance) {
-                    setState((prev) => ({
-                        ...prev,
-                        balance: {
-                            asset: "XLM",
-                            balance: formatStellarAmount(xlmBalance.balance),
-                        },
-                        error: null,
-                    }));
-                }
+                setState((prev) => ({
+                    ...prev,
+                    balance: xlmBalance
+                        ? {
+                              asset: "XLM",
+                              balance: formatStellarAmount(xlmBalance.balance),
+                          }
+                        : null,
+                    error: null,
+                }));
             } catch (error) {
                 console.error("Error fetching balance:", error);
                 setState((prev) => ({
@@ -226,7 +143,59 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
         [],
     );
 
-    // Connect wallet
+    useEffect(() => {
+        const initializeWallet = async () => {
+            try {
+                const installed = await checkFreighterInstalled();
+                if (!installed) {
+                    return;
+                }
+
+                const connected = await isConnected();
+                if (!connected) {
+                    return;
+                }
+
+                const { address } = await getAddress();
+                const publicKey = address;
+
+                if (!publicKey || publicKey.trim() === "") {
+                    console.debug("Connected but no valid address returned");
+                    return;
+                }
+
+                let network: Network = defaultNetwork;
+
+                try {
+                    const { network: freighterNetwork } = await getNetwork();
+                    if (freighterNetwork === "PUBLIC") {
+                        network = "mainnet";
+                    } else if (freighterNetwork === "TESTNET") {
+                        network = "testnet";
+                    }
+                } catch {
+                    network = defaultNetwork;
+                }
+
+                setState((prev) => ({
+                    ...prev,
+                    isConnected: true,
+                    isConnecting: false,
+                    publicKey,
+                    network,
+                    error: null,
+                    lastError: undefined,
+                }));
+
+                await fetchBalance(publicKey, network);
+            } catch (error) {
+                console.debug("Wallet not connected on initialization:", error);
+            }
+        };
+
+        void initializeWallet();
+    }, [defaultNetwork, checkFreighterInstalled, fetchBalance]);
+
     const connect = useCallback(async () => {
         try {
             setState((prev) => ({
@@ -236,41 +205,37 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
                 lastError: undefined,
             }));
 
-            // Check if Freighter is installed
             const installed = await checkFreighterInstalled();
             if (!installed) {
                 const error = new WalletError(
-                    "NOT_INSTALLED" as WalletErrorCode,
+                    WalletErrorCode.NOT_INSTALLED,
                     "Freighter wallet is not installed. Please install it from https://freighter.app",
                 );
                 setLastError(error);
                 throw error;
             }
 
-            // Request connection
             const allowed = await setAllowed();
             if (!allowed) {
                 const error = new WalletError(
-                    "USER_REJECTED" as WalletErrorCode,
+                    WalletErrorCode.USER_REJECTED,
                     "Connection request was rejected",
                 );
                 setLastError(error);
                 throw error;
             }
 
-            // Get public key
             const { address } = await getAddress();
             const publicKey = address;
             if (!publicKey) {
                 const error = new WalletError(
-                    "UNKNOWN_ERROR" as WalletErrorCode,
+                    WalletErrorCode.UNKNOWN_ERROR,
                     "Failed to get public key from wallet",
                 );
                 setLastError(error);
                 throw error;
             }
 
-            // Get network
             let network: Network = defaultNetwork;
             try {
                 const { network: freighterNetwork } = await getNetwork();
@@ -280,7 +245,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
                     network = "testnet";
                 }
             } catch {
-                // Use default if getNetwork fails
                 network = defaultNetwork;
             }
 
@@ -294,7 +258,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
                 lastError: undefined,
             }));
 
-            // Fetch balance
             await fetchBalance(publicKey, network);
         } catch (error) {
             let walletError: WalletError;
@@ -309,7 +272,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
                 const message = String(error.message);
                 if (message.includes("locked") || message.includes("Locked")) {
                     walletError = new WalletError(
-                        "LOCKED" as WalletErrorCode,
+                        WalletErrorCode.LOCKED,
                         "Wallet is locked. Please unlock Freighter and try again.",
                     );
                 } else if (
@@ -317,19 +280,19 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
                     message.includes("Reject")
                 ) {
                     walletError = new WalletError(
-                        "USER_REJECTED" as WalletErrorCode,
+                        WalletErrorCode.USER_REJECTED,
                         "Request was rejected by user",
                     );
                 } else {
                     walletError = new WalletError(
-                        "UNKNOWN_ERROR" as WalletErrorCode,
+                        WalletErrorCode.UNKNOWN_ERROR,
                         message || "Failed to connect wallet",
                         error,
                     );
                 }
             } else {
                 walletError = new WalletError(
-                    "UNKNOWN_ERROR" as WalletErrorCode,
+                    WalletErrorCode.UNKNOWN_ERROR,
                     "An unknown error occurred while connecting wallet",
                     error,
                 );
@@ -349,26 +312,29 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
         }
     }, [defaultNetwork, checkFreighterInstalled, fetchBalance, setLastError]);
 
-    // Disconnect wallet
+    const retryConnection = useCallback(async () => {
+        const status = WalletStateManager.getConnectionStatus(
+            state.isConnected,
+            state.isConnecting,
+            state.error,
+            state.lastError,
+        );
+
+        if (status.canRetry) {
+            await connect();
+        }
+    }, [
+        state.isConnected,
+        state.isConnecting,
+        state.error,
+        state.lastError,
+        connect,
+    ]);
+
     const disconnect = useCallback(async () => {
-        setState({
-            connectionState: "disconnected",
-            isConnected: false,
-            isConnecting: false,
-            publicKey: null,
-            network: defaultNetwork,
-            balance: null,
-            error: null,
-            lastError: undefined,
-            connectionStatus: {
-                state: "disconnected",
-                error: "Connect your wallet to get started",
-                canRetry: false,
-            },
-        });
+        setState(createDisconnectedState(defaultNetwork));
     }, [defaultNetwork]);
 
-    // Switch network
     const switchNetwork = useCallback(
         async (network: Network) => {
             try {
@@ -381,7 +347,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
                         network,
                     }));
 
-                    // Refresh balance for new network
                     await fetchBalance(publicKey, network);
                 }
             } catch (error) {
@@ -394,7 +359,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
                     error: errorMessage,
                 }));
                 throw new WalletError(
-                    "NETWORK_ERROR" as WalletErrorCode,
+                    WalletErrorCode.NETWORK_ERROR,
                     errorMessage,
                     error,
                 );
@@ -403,27 +368,24 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
         [state.publicKey, fetchBalance],
     );
 
-    // Refresh balance
     const refreshBalance = useCallback(async () => {
         if (state.publicKey && state.isConnected) {
             await fetchBalance(state.publicKey, state.network);
         }
     }, [state.publicKey, state.isConnected, state.network, fetchBalance]);
 
-    // Sign transaction
     const signTransactionHandler = useCallback(
         async (transactionXdr: string): Promise<string> => {
             try {
                 if (!state.isConnected || !state.publicKey) {
                     throw new WalletError(
-                        "NOT_INSTALLED" as WalletErrorCode,
+                        WalletErrorCode.NOT_INSTALLED,
                         "Wallet is not connected",
                     );
                 }
 
                 setState((prev) => ({ ...prev, error: null }));
 
-                // Sign transaction using Freighter
                 const response = await signTransaction(transactionXdr, {
                     networkPassphrase: getNetworkPassphrase(state.network),
                     address: state.publicKey,
@@ -440,7 +402,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
                         message.includes("Reject")
                     ) {
                         walletError = new WalletError(
-                            "USER_REJECTED" as WalletErrorCode,
+                            WalletErrorCode.USER_REJECTED,
                             "Transaction signing was rejected by user",
                         );
                     } else if (
@@ -448,19 +410,19 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
                         message.includes("Locked")
                     ) {
                         walletError = new WalletError(
-                            "LOCKED" as WalletErrorCode,
+                            WalletErrorCode.LOCKED,
                             "Wallet is locked. Please unlock Freighter and try again.",
                         );
                     } else {
                         walletError = new WalletError(
-                            "UNKNOWN_ERROR" as WalletErrorCode,
+                            WalletErrorCode.UNKNOWN_ERROR,
                             message || "Failed to sign transaction",
                             error,
                         );
                     }
                 } else {
                     walletError = new WalletError(
-                        "UNKNOWN_ERROR" as WalletErrorCode,
+                        WalletErrorCode.UNKNOWN_ERROR,
                         "An unknown error occurred while signing transaction",
                         error,
                     );
@@ -479,8 +441,17 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
         [state.isConnected, state.publicKey, state.network, setLastError],
     );
 
+    const connectionStatus = getConnectionStatus();
+
     const value: EnhancedWalletContextType = {
         ...state,
+        connectionState: connectionStatus.state,
+        connectionStatus: {
+            ...connectionStatus,
+            retryAction: connectionStatus.canRetry
+                ? retryConnection
+                : undefined,
+        },
         connect,
         disconnect,
         switchNetwork,

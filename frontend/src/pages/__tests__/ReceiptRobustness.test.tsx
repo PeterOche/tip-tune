@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react';
+import { render, waitFor, within } from '@testing-library/react';
 import { screen } from '@testing-library/dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import '@testing-library/jest-dom';
@@ -80,11 +80,9 @@ describe('TipReceiptPage Robustness', () => {
     // Check for some fallback labels
     expect(screen.getByText('minimal-id')).toBeInTheDocument();
     expect(screen.getByText('10.0000000')).toBeInTheDocument();
-    expect(screen.getByText('XLM')).toBeInTheDocument();
-    
-    // Check for "N/A" or fallbacks in areas where data is missing
     const details = screen.getByTestId('transaction-details');
     expect(details).toBeInTheDocument();
+    expect(within(details).getAllByText('XLM').length).toBeGreaterThan(0);
   });
 
   it('shows fallbacks for missing blockchain data', async () => {
@@ -93,7 +91,7 @@ describe('TipReceiptPage Robustness', () => {
       expect(screen.getByTestId('blockchain-proof')).toBeInTheDocument();
     });
 
-    const proof = screen.getByTestId('blockchain-proof');
+    expect(screen.getByTestId('blockchain-proof')).toBeInTheDocument();
     // We expect multiple "N/A" for missing hash, sender, receiver
     const naElements = screen.getAllByText('N/A');
     expect(naElements.length).toBeGreaterThan(0);

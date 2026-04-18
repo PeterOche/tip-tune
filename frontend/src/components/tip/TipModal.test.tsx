@@ -3,7 +3,7 @@
  * Tests for main modal functionality, gestures, and flow
  */
 
-import { render, waitFor } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 import { screen, fireEvent } from '@testing-library/dom';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -196,30 +196,54 @@ describe('TipModal', () => {
 
     describe('Processing Flow', () => {
         it('shows processing animation during tip submission', async () => {
-            const user = userEvent.setup();
-            renderWithProviders(<TipModal {...defaultProps} />);
+            vi.useFakeTimers();
 
-            // Navigate to confirmation
-            const continueBtn1 = screen.getAllByRole('button', { name: /Continue/i })[0];
-            await user.click(continueBtn1);
-            await waitFor(() => screen.getByRole('button', { name: /Review/i }));
-            const reviewBtn = screen.getByRole('button', { name: /Review/i });
-            await user.click(reviewBtn);
+            try {
+                let resolveTip!: () => void;
+                const onTipSuccess = vi.fn().mockImplementation(
+                    () =>
+                        new Promise<void>((resolve) => {
+                            resolveTip = resolve;
+                        }),
+                );
 
-            // Confirm tip
-            await waitFor(() => screen.getByRole('button', { name: /Send Tip/i }));
-            const sendBtn = screen.getByRole('button', { name: /Send Tip/i });
-            await user.click(sendBtn);
+                const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+                renderWithProviders(
+                    <TipModal {...defaultProps} onTipSuccess={onTipSuccess} />,
+                );
 
-            // Should show ProcessingAnimation (matches either processing or confirming due to fast transitions)
-            expect(screen.getByLabelText(/Tip status: (processing|confirming)/i)).toBeInTheDocument();
-            // Match either the initial processing text or the confirmation text
-            expect(screen.getByText(/(Sending to Stellar|Awaiting block confirmation)/i)).toBeInTheDocument();
+                // Navigate to confirmation
+                const continueBtn1 = screen.getAllByRole('button', { name: /Continue/i })[0];
+                await user.click(continueBtn1);
+                await waitFor(() => screen.getByRole('button', { name: /Review/i }));
+                const reviewBtn = screen.getByRole('button', { name: /Review/i });
+                await user.click(reviewBtn);
 
-            // Wait for success step to avoid state leak to subsequent tests
-            await waitFor(() => {
-                expect(screen.getByText(/Tip Sent/i)).toBeInTheDocument();
-            }, { timeout: 5000 });
+                // Confirm tip
+                await waitFor(() => screen.getByRole('button', { name: /Send Tip/i }));
+                const sendBtn = screen.getByRole('button', { name: /Send Tip/i });
+                await user.click(sendBtn);
+
+                expect(screen.getByLabelText(/Tip status: processing/i)).toBeInTheDocument();
+                expect(screen.getByText(/Sending to Stellar/i)).toBeInTheDocument();
+
+                resolveTip();
+                await act(async () => {
+                    await Promise.resolve();
+                });
+
+                await waitFor(() => {
+                    expect(screen.getByLabelText(/Tip status: confirming/i)).toBeInTheDocument();
+                });
+
+                await act(async () => {
+                    await vi.advanceTimersByTimeAsync(2000);
+                });
+
+                expect(screen.getByText(/Tip sent/i)).toBeInTheDocument();
+            } finally {
+                vi.useRealTimers();
+            }
         });
     });
 });

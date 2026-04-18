@@ -1,83 +1,31 @@
-use soroban_sdk::{testutils::Accounts, Env};
-use drip_tip_matching::TipMatchingContract;
+use drip_tip_matching::{TipMatchingContract, TipMatchingContractClient};
+use soroban_sdk::{testutils::Address as _, testutils::Ledger as _, Address, Env};
 
-// Helper function for setup
-fn setup_env_and_addresses(env: &Env) -> (Env, soroban_sdk::Address, soroban_sdk::Address, soroban_sdk::Address) {
+#[test]
+fn test_matching_pool_lifecycle() {
+    let env = Env::default();
     env.mock_all_auths();
-    let sponsor = Accounts::generate(&env);
-    let artist = Accounts::generate(&env);
-    let tipper = Accounts::generate(&env);
-    (env.clone(), sponsor.address.clone(), artist.address.clone(), tipper.address.clone())
-}
 
-#[test]
-fn test_pool_creation_with_valid_params() {
-    let env = Env::default();
-    let (env, sponsor, artist, _tipper) = setup_env_and_addresses(&env);
+    let contract_id = env.register_contract(None, TipMatchingContract);
+    let client = TipMatchingContractClient::new(&env, &contract_id);
 
-    let pool_id = TipMatchingContract::create_matching_pool(
-        env.clone(),
-        sponsor.clone(),
-        artist.clone(),
-        1000,
-        100, // 1:1 match
-        0,   // no cap
-        env.ledger().timestamp() + 10000,
-    ).unwrap();
+    let sponsor = Address::generate(&env);
+    let artist = Address::generate(&env);
+    let tipper = Address::generate(&env);
+    env.ledger().set_timestamp(1_000);
 
-    let pool = TipMatchingContract::get_pool_status(env, pool_id).unwrap();
-    assert_eq!(pool.pool_amount, 1000);
-    assert_eq!(pool.remaining_amount, 1000);
-    assert_eq!(pool.matched_amount, 0);
-    assert_eq!(pool.match_ratio, 100);
-    assert_eq!(pool.match_cap_total, 0);
-}
+    let pool_id = client.create_matching_pool(
+        &sponsor,
+        &artist,
+        &1000,
+        &100,
+        &(env.ledger().timestamp() + 1000),
+    );
 
-#[test]
-fn test_pool_creation_with_match_cap() {
-    let env = Env::default();
-    let (env, sponsor, artist, _tipper) = setup_env_and_addresses(&env);
+    let matched = client.apply_match(&pool_id, &100, &tipper);
+    assert_eq!(matched, 100); // 1:1 match
 
-    let pool_id = TipMatchingContract::create_matching_pool(
-        env.clone(),
-        sponsor.clone(),
-        artist.clone(),
-        1000,
-        100,
-        500, // cap at 500
-        env.ledger().timestamp() + 10000,
-    ).unwrap();
-
-    let pool = TipMatchingContract::get_pool_status(env, pool_id).unwrap();
-    assert_eq!(pool.match_cap_total, 500);
-}
-
-#[test]
-fn test_apply_match_basic_1_to_1() {
-    let env = Env::default();
-    let (env, sponsor, artist, tipper) = setup_env_and_addresses(&env);
-
-    let pool_id = TipMatchingContract::create_matching_pool(
-        env.clone(),
-        sponsor.clone(),
-        artist.clone(),
-        1000,
-        100, // 1:1 match
-        0,
-        env.ledger().timestamp() + 10000,
-    ).unwrap();
-
-    let matched = TipMatchingContract::apply_match(
-        env.clone(),
-        pool_id.clone(),
-        100,
-        tipper.clone(),
-    ).unwrap();
-
-    assert_eq!(matched, 100);
-
-    let pool = TipMatchingContract::get_pool_status(env.clone(), pool_id).unwrap();
-    assert_eq!(pool.matched_amount, 100);
+    let pool = client.get_pool_status(&pool_id);
     assert_eq!(pool.remaining_amount, 900);
 }
 
@@ -448,6 +396,6 @@ fn test_get_budget_functions() {
         tipper.clone(),
     ).unwrap();
 
-    assert_eq!(TipMatchingContract::get_remaining_budget(env.clone(), pool_id.clone()).unwrap(), 750);
-    assert_eq!(TipMatchingContract::get_matched_amount(env, pool_id).unwrap(), 250);
+    let refund = client.cancel_pool(&pool_id, &sponsor);
+    assert_eq!(refund, 900);
 }

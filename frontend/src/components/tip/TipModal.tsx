@@ -6,7 +6,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { animated, useSpring, useTrail } from 'react-spring';
 import { X, Gift } from 'lucide-react';
-import { useSwipeGesture, useVirtualKeyboard, useHaptic } from '../../hooks';
+import { useVirtualKeyboard, useHaptic } from '../../hooks';
 import { useReducedMotion, getSpringConfig } from '../../utils/animationUtils';
 import { getSafeAreaInsets, setupSafeAreaInsets } from '../../utils/gestures';
 import AmountSelector from './AmountSelector';
@@ -57,11 +57,20 @@ const TipModal: React.FC<TipModalProps> = ({
     const [isDismissing, setIsDismissing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [processingPhase, setProcessingPhase] = useState<ProcessingPhase>('idle');
-    const [txHash, setTxHash] = useState<string | undefined>(undefined);
     const { announce } = useLiveRegion();
 
-    const amountRef = useRef<HTMLButtonElement>(null);
-    const closeRef = useRef<HTMLButtonElement>(null);
+    const handleClose = useCallback(() => {
+        setIsDismissing(true);
+        setTimeout(() => {
+            setStep('amount');
+            setTipAmount(5);
+            setCurrency('XLM');
+            setMessage('');
+            setError(null);
+            setIsDismissing(false);
+            onClose();
+        }, 300);
+    }, [onClose]);
 
     // Initialize safe area insets on mount
     useEffect(() => {
@@ -85,7 +94,7 @@ const TipModal: React.FC<TipModalProps> = ({
             document.removeEventListener('keydown', handleKeyDown);
             document.body.style.overflow = 'unset';
         };
-    }, [isOpen]);
+    }, [handleClose, isOpen]);
 
     // Focus trap implementation
     useEffect(() => {
@@ -127,19 +136,6 @@ const TipModal: React.FC<TipModalProps> = ({
             document.removeEventListener('keydown', handleFocusTrap);
         };
     }, [isOpen]);
-
-    const handleClose = useCallback(() => {
-        setIsDismissing(true);
-        setTimeout(() => {
-            setStep('amount');
-            setTipAmount(5);
-            setCurrency('XLM');
-            setMessage('');
-            setError(null);
-            setIsDismissing(false);
-            onClose();
-        }, 300);
-    }, [onClose]);
 
     const handleAmountChange = useCallback((amount: number) => {
         setTipAmount(amount);
@@ -327,7 +323,6 @@ const TipModal: React.FC<TipModalProps> = ({
                         <div className="flex flex-col items-center justify-center py-12">
                             <ProcessingAnimation 
                                 phase={processingPhase} 
-                                txHash={txHash}
                                 onComplete={() => setStep('success')}
                             />
                         </div>

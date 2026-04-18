@@ -1,19 +1,41 @@
 #![no_std]
-use soroban_sdk::{contractimpl, Address, Env, Vec, Symbol, symbol_short};
-mod types;
+use soroban_sdk::{contract, contractimpl, Address, Env, String};
 mod errors;
 mod events;
+mod types;
 
-use types::{MatchingPool, PoolStatus};
 use errors::Error;
-use events::*;
+use types::{DataKey, MatchingPool, PoolStatus};
 
-#[derive(Clone)]
-pub enum DataKey {
-    Pool(Vec<u8>),
-}
-
+#[contract]
 pub struct TipMatchingContract;
+
+fn next_pool_id(env: &Env) -> String {
+    let count: u32 = env
+        .storage()
+        .instance()
+        .get(&DataKey::PoolCount)
+        .unwrap_or(0);
+    let next = count + 1;
+    env.storage().instance().set(&DataKey::PoolCount, &next);
+
+    let mut buf = [0u8; 10];
+    let mut i = 10;
+    let mut n = next;
+
+    if n == 0 {
+        i -= 1;
+        buf[i] = b'0';
+    } else {
+        while n > 0 {
+            i -= 1;
+            buf[i] = b'0' + (n % 10) as u8;
+            n /= 10;
+        }
+    }
+
+    String::from_bytes(env, &buf[i..])
+}
 
 #[contractimpl]
 impl TipMatchingContract {
@@ -34,11 +56,10 @@ impl TipMatchingContract {
         match_ratio: u32,
         match_cap_total: i128,
         end_time: u64,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<String, Error> {
         sponsor.require_auth();
 
-        // Validate parameters
-        if pool_amount <= 0 {
+        if pool_amount <= 0 || match_ratio == 0 || end_time <= env.ledger().timestamp() {
             return Err(Error::InvalidParameters);
         }
         if match_ratio == 0 {
@@ -56,6 +77,7 @@ impl TipMatchingContract {
         pool_id_data.append(&mut env.ledger().timestamp().to_be_bytes().into());
         let pool_id = env.crypto().sha256(&pool_id_data);
 
+        let pool_id = next_pool_id(&env);
         let pool = MatchingPool {
             pool_id: pool_id.clone(),
             sponsor: sponsor.clone(),
@@ -72,19 +94,10 @@ impl TipMatchingContract {
             refunded_at: 0,
         };
 
-        env.storage().persistent().set(&DataKey::Pool(pool_id.clone()), &pool);
-
-        emit_pool_created(
-            &env,
-            &pool_id,
-            &sponsor,
-            &artist,
-            pool_amount,
-            match_ratio,
-            match_cap_total,
-            end_time,
-        );
-
+        env.storage()
+            .persistent()
+            .set(&DataKey::Pool(pool_id.clone()), &pool);
+        events::emit_pool_created(&env, &pool_id);
         Ok(pool_id)
     }
 
@@ -97,22 +110,24 @@ impl TipMatchingContract {
         tip_amount: i128,
         tipper: Address,
     ) -> Result<i128, Error> {
+        tipper.require_auth();
+
         if tip_amount <= 0 {
             return Err(Error::InvalidParameters);
         }
 
+        let key = DataKey::Pool(pool_id.clone());
         let mut pool: MatchingPool = env
             .storage()
             .persistent()
-            .get(&DataKey::Pool(pool_id.clone()))
+            .get(&key)
             .ok_or(Error::PoolNotFound)?;
 
         // Check pool status and timing
         let current_time = env.ledger().timestamp();
         if current_time > pool.end_time {
             pool.status = PoolStatus::Expired;
-            env.storage().persistent().set(&DataKey::Pool(pool_id.clone()), &pool);
-            emit_pool_depleted(&env, &pool_id, symbol_short!("expired"), pool.matched_amount);
+            env.storage().persistent().set(&key, &pool);
             return Err(Error::PoolExpired);
         }
 
@@ -172,51 +187,27 @@ impl TipMatchingContract {
             pool.status = PoolStatus::Exhausted;
         }
 
-        env.storage().persistent().set(&DataKey::Pool(pool_id.clone()), &pool);
-
-        emit_tip_matched(&env, &pool_id, &tipper, tip_amount, actual_match, pool.matched_amount);
-
+        env.storage().persistent().set(&key, &pool);
+        events::emit_tip_matched(&env, &pool_id, &tipper, actual_match);
         Ok(actual_match)
     }
 
-    /// Get current pool status
-    pub fn get_pool_status(env: Env, pool_id: Vec<u8>) -> Result<MatchingPool, Error> {
+    pub fn get_pool_status(env: Env, pool_id: String) -> Result<MatchingPool, Error> {
         env.storage()
             .persistent()
             .get(&DataKey::Pool(pool_id))
             .ok_or(Error::PoolNotFound)
     }
 
-    /// Get remaining match budget for a pool
-    pub fn get_remaining_budget(env: Env, pool_id: Vec<u8>) -> Result<i128, Error> {
-        let pool: MatchingPool = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Pool(pool_id))
-            .ok_or(Error::PoolNotFound)?;
-
-        Ok(pool.remaining_amount)
-    }
-
-    /// Get total matched amount so far
-    pub fn get_matched_amount(env: Env, pool_id: Vec<u8>) -> Result<i128, Error> {
-        let pool: MatchingPool = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Pool(pool_id))
-            .ok_or(Error::PoolNotFound)?;
-
-        Ok(pool.matched_amount)
-    }
-
-    /// Cancel a pool and return unmatched funds to sponsor.
-    /// Only the sponsor can cancel.
-    pub fn cancel_pool(
-        env: Env,
-        pool_id: Vec<u8>,
-        sponsor: Address,
-    ) -> Result<i128, Error> {
+    pub fn cancel_pool(env: Env, pool_id: String, sponsor: Address) -> Result<i128, Error> {
         sponsor.require_auth();
+
+        let key = DataKey::Pool(pool_id.clone());
+        let mut pool: MatchingPool = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .ok_or(Error::PoolNotFound)?;
 
         let mut pool: MatchingPool = env
             .storage()
@@ -243,68 +234,8 @@ impl TipMatchingContract {
 
         emit_pool_cancelled(&env, &pool_id, refund, pool.matched_amount);
 
+        env.storage().persistent().set(&key, &pool);
+        events::emit_pool_cancelled(&env, &pool_id, refund);
         Ok(refund)
-    }
-
-    /// Close a pool after end_time or when depleted.
-    /// Anyone can close an inactive pool.
-    pub fn close_pool(
-        env: Env,
-        pool_id: Vec<u8>,
-    ) -> Result<(), Error> {
-        let mut pool: MatchingPool = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Pool(pool_id.clone()))
-            .ok_or(Error::PoolNotFound)?;
-
-        let current_time = env.ledger().timestamp();
-
-        // Can close if:
-        // 1. Pool is exhausted, or
-        // 2. Pool has expired and enough time has passed
-        let can_close = pool.status == PoolStatus::Exhausted
-            || (current_time > pool.end_time && pool.status != PoolStatus::Cancelled);
-
-        if !can_close {
-            return Err(Error::PoolNotActive);
-        }
-
-        let reason = if current_time > pool.end_time {
-            symbol_short!("expired")
-        } else {
-            symbol_short!("depleted")
-        };
-
-        pool.status = PoolStatus::Closed;
-
-        env.storage().persistent().set(&DataKey::Pool(pool_id.clone()), &pool);
-
-        emit_pool_closed(&env, &pool_id, reason, pool.matched_amount);
-
-        Ok(())
-    }
-
-    /// Check if pool is active (not expired or exhausted)
-    pub fn is_pool_active(env: Env, pool_id: Vec<u8>) -> Result<bool, Error> {
-        let pool: MatchingPool = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Pool(pool_id))
-            .ok_or(Error::PoolNotFound)?;
-
-        if pool.status != PoolStatus::Active {
-            return Ok(false);
-        }
-
-        if env.ledger().timestamp() > pool.end_time {
-            return Ok(false);
-        }
-
-        if pool.remaining_amount <= 0 {
-            return Ok(false);
-        }
-
-        Ok(true)
     }
 }

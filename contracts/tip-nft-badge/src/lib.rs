@@ -156,6 +156,7 @@ impl TipNftBadgeContract {
             return Err(Error::AlreadyMinted);
         }
 
+        // Check eligibility
         if !Self::check_badge_eligibility(env.clone(), user.clone(), badge_type) {
             return Err(Error::NotEligible);
         }
@@ -164,24 +165,24 @@ impl TipNftBadgeContract {
         total += 1;
         env.storage().instance().set(&DataKey::TotalBadges, &total);
 
-        // Generate simple ID string
-        let badge_id = String::from_str(&env, "BADGE-");
-        // (Simplified for brevity, but could use the counter)
-        
-        let (name, desc) = match badge_type {
-            BadgeType::FirstTip => (String::from_str(&env, "First Tip"), String::from_str(&env, "Awarded for your first tip!")),
-            BadgeType::TenTips => (String::from_str(&env, "Ten Tips"), String::from_str(&env, "Awarded for sending 10 tips!")),
-            BadgeType::HundredTips => (String::from_str(&env, "Century Tipper"), String::from_str(&env, "Awarded for sending 100 tips!")),
-            BadgeType::WhaleTipper => (String::from_str(&env, "Whale Tipper"), String::from_str(&env, "Awarded for significant total contributions!")),
-            BadgeType::EarlySupporter => (String::from_str(&env, "Early Adopter"), String::from_str(&env, "Awarded for supporting the platform in its early days!")),
-            BadgeType::GenreSupporter => (String::from_str(&env, "Genre Fan"), String::from_str(&env, "Awarded for repeated support in a specific genre!")),
-        };
+        let mut buf = [0u8; 10];
+        let mut i = 10;
+        let mut n = total;
+        if n == 0 {
+            i -= 1;
+            buf[i] = b'0';
+        } else {
+            while n > 0 {
+                i -= 1;
+                buf[i] = b'0' + (n % 10) as u8;
+                n /= 10;
+            }
+        }
+        let badge_id = String::from_bytes(&env, &buf[i..]);
 
         let metadata = BadgeMetadata {
             badge_id: badge_id.clone(),
             badge_type,
-            name,
-            description: desc,
             owner: user.clone(),
             minted_at: env.ledger().timestamp(),
         };

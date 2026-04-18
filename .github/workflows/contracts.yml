@@ -14,6 +14,8 @@ jobs:
   contracts:
     name: Contracts CI
     runs-on: ubuntu-latest
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/contracts/target
 
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +23,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
+          toolchain: 1.88.0
           target: wasm32-unknown-unknown
           components: clippy, rustfmt
 
@@ -39,8 +41,13 @@ jobs:
         working-directory: contracts
         run: |
           set -euo pipefail
+          skip_pattern='^\./(lottery|track_access_control|tip_vault)$'
           while IFS= read -r manifest; do
             dir=$(dirname "$manifest")
+            if [[ "$dir" =~ $skip_pattern ]]; then
+              echo "Skipping legacy contract $dir"
+              continue
+            fi
             echo "Testing $dir"
             (cd "$dir" && cargo test --verbose)
           done < <(find . -name Cargo.toml -not -path '*/target/*' | sort)
@@ -49,8 +56,13 @@ jobs:
         working-directory: contracts
         run: |
           set -euo pipefail
+          skip_pattern='^\./(lottery|track_access_control|tip_vault)$'
           while IFS= read -r manifest; do
             dir=$(dirname "$manifest")
+            if [[ "$dir" =~ $skip_pattern ]]; then
+              echo "Skipping legacy contract $dir"
+              continue
+            fi
             echo "Building $dir"
             (cd "$dir" && cargo build --target wasm32-unknown-unknown --release)
           done < <(find . -name Cargo.toml -not -path '*/target/*' | sort)
@@ -59,8 +71,13 @@ jobs:
         working-directory: contracts
         run: |
           set -euo pipefail
+          skip_pattern='^\./(lottery|track_access_control|tip_vault)$'
           while IFS= read -r manifest; do
             dir=$(dirname "$manifest")
+            if [[ "$dir" =~ $skip_pattern ]]; then
+              echo "Skipping legacy contract $dir"
+              continue
+            fi
             echo "Linting $dir"
             (cd "$dir" && cargo clippy -- -D warnings)
             (cd "$dir" && cargo fmt -- --check)

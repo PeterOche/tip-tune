@@ -208,8 +208,7 @@ describe("WalletStateManager", () => {
 });
 
 describe("Enhanced Wallet Hook Integration", () => {
-    // Mock the original useWallet hook
-    const mockOriginalWallet = {
+    const createMockOriginalWallet = () => ({
         isConnected: false,
         isConnecting: false,
         publicKey: null,
@@ -221,10 +220,14 @@ describe("Enhanced Wallet Hook Integration", () => {
         switchNetwork: jest.fn(),
         refreshBalance: jest.fn(),
         signTransaction: jest.fn(),
-    };
+    });
+
+    // Mock the original useWallet hook
+    const mockOriginalWallet = createMockOriginalWallet();
 
     beforeEach(() => {
         jest.clearAllMocks();
+        Object.assign(mockOriginalWallet, createMockOriginalWallet());
     });
 
     describe("useEnhancedWallet", () => {

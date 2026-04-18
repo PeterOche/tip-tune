@@ -36,7 +36,15 @@ fn test_tip_lifecycle() {
     let amount = 100;
     let message = String::from_str(&env, "Happy Birthday!");
 
-    let lock_id = client.create_time_lock_tip(&tipper, &artist, &amount, &token.address, &unlock_time, &message, &1);
+    let lock_id = client.create_time_lock_tip(
+        &tipper,
+        &artist,
+        &amount,
+        &token.address,
+        &unlock_time,
+        &message,
+        &1,
+    );
 
     // Check balance
     assert_eq!(token.balance(&tipper), 900);
@@ -83,7 +91,15 @@ fn test_refund_lifecycle() {
     let amount = 100;
     let message = String::from_str(&env, "Testing refund");
 
-    let lock_id = client.create_time_lock_tip(&tipper, &artist, &amount, &token.address, &unlock_time, &message, &1);
+    let lock_id = client.create_time_lock_tip(
+        &tipper,
+        &artist,
+        &amount,
+        &token.address,
+        &unlock_time,
+        &message,
+        &1,
+    );
 
     // Try to refund before 30 days
     env.ledger().set_timestamp(unlock_time + 100);
@@ -120,8 +136,24 @@ fn test_get_pending_tips() {
     let current_time = 10000;
     env.ledger().set_timestamp(current_time);
 
-    client.create_time_lock_tip(&tipper, &artist, &100, &token.address, &(current_time + 1000), &String::from_str(&env, "Tip 1"), &1);
-    client.create_time_lock_tip(&tipper, &artist, &200, &token.address, &(current_time + 2000), &String::from_str(&env, "Tip 2"), &2);
+    client.create_time_lock_tip(
+        &tipper,
+        &artist,
+        &100,
+        &token.address,
+        &(current_time + 1000),
+        &String::from_str(&env, "Tip 1"),
+        &1,
+    );
+    client.create_time_lock_tip(
+        &tipper,
+        &artist,
+        &200,
+        &token.address,
+        &(current_time + 2000),
+        &String::from_str(&env, "Tip 2"),
+        &2,
+    );
 
     let pending = client.get_pending_tips(&artist);
     assert_eq!(pending.len(), 2);
@@ -151,8 +183,24 @@ fn test_replay_create_time_lock_tip_fails() {
     let amount = 100;
     let message = String::from_str(&env, "Test");
 
-    client.create_time_lock_tip(&tipper, &artist, &amount, &token.address, &unlock_time, &message, &1);
-    let result = client.try_create_time_lock_tip(&tipper, &artist, &amount, &token.address, &unlock_time, &message, &1);
+    client.create_time_lock_tip(
+        &tipper,
+        &artist,
+        &amount,
+        &token.address,
+        &unlock_time,
+        &message,
+        &1,
+    );
+    let result = client.try_create_time_lock_tip(
+        &tipper,
+        &artist,
+        &amount,
+        &token.address,
+        &unlock_time,
+        &message,
+        &1,
+    );
     assert!(result.is_err());
 }
 
@@ -178,7 +226,15 @@ fn test_replay_claim_tip_fails() {
     let amount = 100;
     let message = String::from_str(&env, "Test");
 
-    let lock_id = client.create_time_lock_tip(&tipper, &artist, &amount, &token.address, &unlock_time, &message, &1);
+    let lock_id = client.create_time_lock_tip(
+        &tipper,
+        &artist,
+        &amount,
+        &token.address,
+        &unlock_time,
+        &message,
+        &1,
+    );
 
     // Advance time
     env.ledger().set_timestamp(unlock_time);
@@ -210,7 +266,15 @@ fn test_replay_refund_tip_fails() {
     let amount = 100;
     let message = String::from_str(&env, "Test");
 
-    let lock_id = client.create_time_lock_tip(&tipper, &artist, &amount, &token.address, &unlock_time, &message, &1);
+    let lock_id = client.create_time_lock_tip(
+        &tipper,
+        &artist,
+        &amount,
+        &token.address,
+        &unlock_time,
+        &message,
+        &1,
+    );
 
     // Advance time for refund
     let thirty_days = 30 * 24 * 60 * 60;

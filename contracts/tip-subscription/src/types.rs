@@ -36,6 +36,4 @@ pub enum Error {
     InvalidStatus = 3,
     PaymentTooEarly = 4,
     InvalidAmount = 5,
-    Overflow = 6,              // Counter or amount overflow
-    TimestampOverflow = 7,     // Timestamp calculation overflow
 }

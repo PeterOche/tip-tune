@@ -47,10 +47,10 @@ export class SubscriptionsController {
   @Patch("tiers/:tierId")
   async updateTier(
     @Param("tierId", ParseUUIDPipe) tierId: string,
+    @CurrentUser("userId") userId: string,
     @Body() dto: UpdateSubscriptionTierDto,
   ) {
-    // Note: artist ownership should be enforced in service using user context if needed
-    return this.subscriptionsService.updateTier(tierId, dto.artistId, dto);
+    return this.subscriptionsService.updateTier(tierId, userId, dto);
   }
 
   /**
@@ -71,7 +71,7 @@ export class SubscriptionsController {
    */
   @Post("subscribe")
   async subscribe(@Body() dto: CreateArtistSubscriptionDto, @CurrentUser("userId") userId: string) {
-    return this.subscriptionsService.subscribe(userId, dto.tierId);
+    return this.subscriptionsService.subscribe(dto, userId);
   }
 
   /**

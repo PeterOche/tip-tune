@@ -1,4 +1,14 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+  "exclude": [
+    "node_modules",
+    "test",
+    "dist",
+    "**/*spec.ts",
+    "src/mount-waveform/**/*",
+    "src/standardized-subscription/**/*",
+    "src/supported-asset-catalog/**/*",
+    "src/unify-redis/**/*",
+    "src/waveform.processor.ts"
+  ]
 }

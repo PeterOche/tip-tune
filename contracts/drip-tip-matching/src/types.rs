@@ -1,6 +1,7 @@
-use soroban_sdk::{Address, Symbol};
+use soroban_sdk::{contracttype, Address, String};
 
-#[derive(Clone)]
+#[contracttype]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum PoolStatus {
     Active,
     Exhausted,
@@ -8,7 +9,8 @@ pub enum PoolStatus {
     Cancelled,
 }
 
-#[derive(Clone)]
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MatchingPool {
     pub pool_id: String,
     pub sponsor: Address,
@@ -19,4 +21,11 @@ pub struct MatchingPool {
     pub start_time: u64,
     pub end_time: u64,
     pub status: PoolStatus,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DataKey {
+    Pool(String),
+    PoolCount,
 }

@@ -172,7 +172,7 @@ impl TipNftBadgeContract {
         }
 
         // Check eligibility
-        if !Self::check_badge_eligibility(env.clone(), user.clone(), badge_type.clone()) {
+        if !Self::check_badge_eligibility(env.clone(), user.clone(), badge_type) {
             return Err(Error::NotEligible);
         }
 
@@ -198,11 +198,11 @@ impl TipNftBadgeContract {
                 n /= 10;
             }
         }
-        let badge_id = String::from_slice(&env, &buf[i..]);
+        let badge_id = String::from_bytes(&env, &buf[i..]);
 
         let metadata = BadgeMetadata {
             badge_id: badge_id.clone(),
-            badge_type: badge_type.clone(),
+            badge_type,
             owner: user.clone(),
             minted_at: env.ledger().timestamp(),
         };

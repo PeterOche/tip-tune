@@ -112,7 +112,7 @@ impl TipGoalCampaignContract {
                 n /= 10;
             }
         }
-        let campaign_id = String::from_slice(&env, &buf[i..]);
+        let campaign_id = String::from_bytes(&env, &buf[i..]);
 
         let campaign = Campaign {
             campaign_id: campaign_id.clone(),
@@ -246,7 +246,7 @@ impl TipGoalCampaignContract {
         // Emit finalization event
         env.events().publish(
             (symbol_short!("campaign"), symbol_short!("final")),
-            (campaign_id, result.clone()),
+            (campaign_id, result),
         );
 
         Ok(result)

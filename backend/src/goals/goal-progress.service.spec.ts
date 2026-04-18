@@ -5,7 +5,7 @@ import { GoalProgressService } from './goal-progress.service';
 import { TipGoal } from './entities/tip-goal.entity';
 import { GoalProgressSnapshot } from './entities/goal-progress-snapshot.entity';
 import { SupporterActivitySummary } from './entities/supporter-activity-summary.entity';
-import { Tip } from '../tips/entities/tip.entity';
+import { Tip, TipStatus, TipType } from '../tips/entities/tip.entity';
 import { TipVerifiedEvent } from '../tips/events/tip-verified.event';
 
 describe('GoalProgressService', () => {
@@ -13,7 +13,6 @@ describe('GoalProgressService', () => {
   let goalRepository: Repository<TipGoal>;
   let snapshotRepository: Repository<GoalProgressSnapshot>;
   let supporterSummaryRepository: Repository<SupporterActivitySummary>;
-  let tipRepository: Repository<Tip>;
 
   const mockGoal = {
     id: 'goal-1',
@@ -23,14 +22,28 @@ describe('GoalProgressService', () => {
     supporters: [],
   };
 
-  const mockTip = {
-    id: 'tip-1',
-    goalId: 'goal-1',
-    amount: 25,
-    fromUser: 'user-1',
-    isAnonymous: false,
-    senderAddress: 'address-1',
-  };
+  const createMockTip = (overrides: Partial<Tip> = {}): Tip =>
+    ({
+      id: 'tip-1',
+      artistId: 'artist-1',
+      goalId: 'goal-1',
+      stellarTxHash: 'stellar-hash-1',
+      senderAddress: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
+      receiverAddress: 'GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBR',
+      amount: 25,
+      assetCode: 'XLM',
+      fromUser: 'user-1',
+      assetType: 'native',
+      status: TipStatus.VERIFIED,
+      type: TipType.ARTIST,
+      isAnonymous: false,
+      asset: 'XLM',
+      isPublic: true,
+      isDeleted: false,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      ...overrides,
+    }) as Tip;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -39,6 +52,7 @@ describe('GoalProgressService', () => {
         {
           provide: getRepositoryToken(TipGoal),
           useValue: {
+            findOne: jest.fn().mockResolvedValue(mockGoal),
             manager: {
               transaction: jest.fn((callback) => callback({
                 findOne: jest.fn().mockResolvedValue(mockGoal),
@@ -62,10 +76,6 @@ describe('GoalProgressService', () => {
             find: jest.fn().mockResolvedValue([]),
           },
         },
-        {
-          provide: getRepositoryToken(Tip),
-          useValue: {},
-        },
       ],
     }).compile();
 
@@ -73,7 +83,6 @@ describe('GoalProgressService', () => {
     goalRepository = module.get<Repository<TipGoal>>(getRepositoryToken(TipGoal));
     snapshotRepository = module.get<Repository<GoalProgressSnapshot>>(getRepositoryToken(GoalProgressSnapshot));
     supporterSummaryRepository = module.get<Repository<SupporterActivitySummary>>(getRepositoryToken(SupporterActivitySummary));
-    tipRepository = module.get<Repository<Tip>>(getRepositoryToken(Tip));
   });
 
   it('should be defined', () => {
@@ -82,7 +91,7 @@ describe('GoalProgressService', () => {
 
   describe('handleTipVerified', () => {
     it('should skip tips without goalId', async () => {
-      const event = new TipVerifiedEvent({ ...mockTip, goalId: null }, 'user-1');
+      const event = new TipVerifiedEvent(createMockTip({ goalId: undefined }), 'user-1');
 
       await service.handleTipVerified(event);
 
@@ -91,7 +100,7 @@ describe('GoalProgressService', () => {
     });
 
     it('should update goal progress for tips with goalId', async () => {
-      const event = new TipVerifiedEvent(mockTip, 'user-1');
+      const event = new TipVerifiedEvent(createMockTip(), 'user-1');
 
       await service.handleTipVerified(event);
 

@@ -1,5 +1,5 @@
-use soroban_sdk::{contracttype, Env, String};
 use crate::types::Subscription;
+use soroban_sdk::{contracttype, Env, String};
 
 #[contracttype]
 #[derive(Clone)]
@@ -30,5 +30,7 @@ pub fn read_subscription(env: &Env, id: &String) -> Option<Subscription> {
 }
 
 pub fn remove_subscription(env: &Env, id: &String) {
-    env.storage().persistent().remove(&DataKey::Subscription(id.clone()));
+    env.storage()
+        .persistent()
+        .remove(&DataKey::Subscription(id.clone()));
 }

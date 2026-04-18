@@ -8,9 +8,11 @@ export interface LiveTipEvent {
 }
 
 export interface LeaderboardEntry {
+  supporterId: string;
   tipperName: string;
   total: number;
   tipCount: number;
+  sortOrder: number;
 }
 
 export interface LiveSessionState {

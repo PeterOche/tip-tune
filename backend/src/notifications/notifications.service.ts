@@ -26,14 +26,14 @@ export class NotificationsService {
     title: string;
     message: string;
     data?: any;
-    fromUserId?: string;
+    fromUser?: string;
   }) {
     // Check if the recipient has muted the sender (suppress notification)
-    if (createNotificationDto.fromUserId) {
+    if (createNotificationDto.fromUser) {
       const shouldSuppress =
         await this.blocksService.shouldSuppressNotification(
           createNotificationDto.userId,
-          createNotificationDto.fromUserId,
+          createNotificationDto.fromUser,
         );
       if (shouldSuppress) {
         // Still save the notification but don't send real-time alert
@@ -76,7 +76,7 @@ export class NotificationsService {
     const data = {
       tipId: tip.id,
       amount: tip.amount,
-      senderId: tip.fromUserId,
+      fromUser: tip.fromUser,
       stellarTxHash: tip.stellarTxHash,
     };
 
@@ -129,7 +129,7 @@ export class NotificationsService {
 
   async sendCollaborationInvite(data: any) {
     const notification = this.notificationRepository.create({
-      userId: data.artistId,
+      userId: data.userId, // Use userId instead of artistId
       type: NotificationType.COLLABORATION_INVITE,
       title: "New Collaboration Invite",
       message: `${data.invitedBy} invited you to collaborate on "${data.trackTitle}"`,
@@ -147,7 +147,7 @@ export class NotificationsService {
     // Emit via WebSocket
     if (this.notificationsGateway) {
       this.notificationsGateway.sendNotificationToArtist(
-        data.artistId,
+        data.userId, // Use userId instead of artistId
         savedNotification,
       );
     }
@@ -157,7 +157,7 @@ export class NotificationsService {
 
   async sendCollaborationResponse(data: any) {
     const notification = this.notificationRepository.create({
-      userId: data.artistId,
+      userId: data.userId, // Use userId instead of artistId
       type: NotificationType.COLLABORATION_RESPONSE,
       title: `Collaboration ${data.status === "approved" ? "Accepted" : "Declined"}`,
       message: `${data.collaboratorName} ${data.status === "approved" ? "accepted" : "declined"} collaboration on "${data.trackTitle}"`,
@@ -174,7 +174,7 @@ export class NotificationsService {
     // Emit via WebSocket
     if (this.notificationsGateway) {
       this.notificationsGateway.sendNotificationToArtist(
-        data.artistId,
+        data.userId, // Use userId instead of artistId
         savedNotification,
       );
     }

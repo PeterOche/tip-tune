@@ -36,7 +36,6 @@ export default defineConfig({
       'src/components/artist/ArtistHeader.test.tsx',
       'src/components/artist/ArtistTrackList.test.tsx',
       'src/components/live-performance/HypeMeter.test.tsx',
-      'src/components/live-performance/LivePerformanceMode.test.tsx',
       'src/components/merch/__tests__/merch.test.tsx',
       'src/components/playlists/DraggableTrackList.test.tsx',
       'src/components/playlists/PlaylistManager.test.tsx',

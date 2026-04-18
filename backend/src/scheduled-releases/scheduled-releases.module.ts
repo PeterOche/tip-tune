@@ -9,10 +9,12 @@ import { PreSave } from "./entities/presave.entity";
 import { Track } from "../tracks/entities/track.entity";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { FollowsModule } from "../follows/follows.module";
+import { QueueModule } from "../queue/queue.module";
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ScheduledRelease, PreSave, Track]),
+    QueueModule,
     ScheduleModule.forRoot(),
     NotificationsModule,
     FollowsModule,

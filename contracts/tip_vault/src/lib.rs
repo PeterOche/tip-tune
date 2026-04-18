@@ -52,8 +52,14 @@ impl TipVaultContract {
     }
 
     pub fn deposit_to_vault(env: Env, vault_id: String, amount: i128) -> Result<(), TipVaultError> {
+        if amount <= 0 {
+            return Err(TipVaultError::InsufficientBalance);
+        }
+        
         let mut vault: TipVault = env.storage().get(&vault_id).ok_or(TipVaultError::VaultNotFound)?;
-        vault.locked_amount += amount;
+        vault.locked_amount = vault.locked_amount
+            .checked_add(amount)
+            .ok_or(TipVaultError::Overflow)?;
         env.storage().set(&vault_id, &vault);
         env.events().publish((Symbol::short("deposit"), vault_id.clone()), amount);
         Ok(())
@@ -72,13 +78,19 @@ impl TipVaultContract {
 
         let amount_to_release = vault.locked_amount;
         vault.locked_amount = 0;
-        vault.total_released += amount_to_release;
+        vault.total_released = vault.total_released
+            .checked_add(amount_to_release)
+            .ok_or(TipVaultError::Overflow)?;
 
-        // Update next_release based on frequency
+        // Update next_release based on frequency using checked arithmetic
         let next_release = match vault.release_frequency {
             ReleaseFrequency::Instant => now,
-            ReleaseFrequency::Weekly => now + 7 * 24 * 60 * 60,
-            ReleaseFrequency::Monthly => now + 30 * 24 * 60 * 60,
+            ReleaseFrequency::Weekly => now
+                .checked_add(7 * 24 * 60 * 60)
+                .ok_or(TipVaultError::TimestampOverflow)?,
+            ReleaseFrequency::Monthly => now
+                .checked_add(30 * 24 * 60 * 60)
+                .ok_or(TipVaultError::TimestampOverflow)?,
         };
         vault.next_release = next_release;
 

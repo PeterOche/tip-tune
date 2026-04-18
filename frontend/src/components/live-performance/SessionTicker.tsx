@@ -30,4 +30,4 @@ const SessionTicker: React.FC<SessionTickerProps> = ({
   );
 };
 
-export default SessionTicker;
+export default React.memo(SessionTicker);

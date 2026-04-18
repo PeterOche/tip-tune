@@ -95,8 +95,12 @@ impl TipEscrowContract {
         artist: Address,
         token_address: Address,
         amount: i128,
-    ) -> u64 {
+    ) -> Result<u64, Error> {
         sender.require_auth();
+
+        if amount <= 0 {
+            return Err(Error::InvalidAmount);
+        }
 
         let token_client = token::Client::new(&env, &token_address);
         let tip_id = env.ledger().sequence() as u64;
@@ -107,10 +111,16 @@ impl TipEscrowContract {
             let mut remaining = amount;
 
             for split in splits.iter() {
-                let split_amount = (amount * split.percentage as i128) / 10000;
+                let split_amount = amount
+                    .checked_mul(split.percentage as i128)
+                    .ok_or(Error::Overflow)?
+                    .checked_div(10000)
+                    .ok_or(Error::Overflow)?;
                 if split_amount > 0 {
                     token_client.transfer(&sender, &split.recipient, &split_amount);
-                    remaining -= split_amount;
+                    remaining = remaining
+                        .checked_sub(split_amount)
+                        .ok_or(Error::Underflow)?;
                 }
             }
 
@@ -132,7 +142,7 @@ impl TipEscrowContract {
         };
         storage::save_tip(&env, tip_id, &tip);
 
-        tip_id
+        Ok(tip_id)
     }
 
     /// Configure royalty splits for an artist

@@ -9,11 +9,9 @@ import { Repository, DataSource } from "typeorm";
 import {
   Collaboration,
   ApprovalStatus,
-  CollaborationRole,
 } from "./entities/collaboration.entity";
 import { Track } from "../tracks/entities/track.entity";
 import { Artist } from "../artists/entities/artist.entity";
-import { CreateCollaborationDto } from "./dto/create-collaboration.dto";
 import { UpdateCollaborationDto } from "./dto/update-collaboration.dto";
 import { UpdateApprovalDto } from "./dto/update-approval.dto";
 import { InviteCollaboratorsDto } from "./dto/invite-collaborators.dto";
@@ -86,10 +84,25 @@ export class CollaborationService {
         );
       }
 
+      // Additional validation: ensure minimum split for primary artist
+      const primaryArtistSplit = 100 - totalSplit;
+      if (primaryArtistSplit < 0.01) {
+        throw new BadRequestException(
+          "Primary artist must retain at least 0.01% of split",
+        );
+      }
+
       // Create collaborations
       const collaborations: Collaboration[] = [];
 
       for (const collabDto of dto.collaborators) {
+        // Validate split percentage bounds
+        if (collabDto.splitPercentage < 0.01 || collabDto.splitPercentage > 100) {
+          throw new BadRequestException(
+            `Invalid split percentage: ${collabDto.splitPercentage}%. Must be between 0.01% and 100%`,
+          );
+        }
+
         // Verify artist exists
         const artist = await this.artistRepo.findOne({
           where: { id: collabDto.artistId },
@@ -99,14 +112,19 @@ export class CollaborationService {
           throw new NotFoundException(`Artist ${collabDto.artistId} not found`);
         }
 
-        // Check for duplicate
+        // Prevent self-invitation
+        if (artist.userId === userId) {
+          throw new BadRequestException("Cannot invite yourself as a collaborator");
+        }
+
+        // Check for duplicate invitation (including pending ones)
         const existing = await this.collaborationRepo.findOne({
           where: { trackId: dto.trackId, artistId: collabDto.artistId },
         });
 
         if (existing) {
           throw new BadRequestException(
-            `Artist ${artist.artistName} is already a collaborator`,
+            `Artist ${artist.artistName} is already invited or collaborating on this track`,
           );
         }
 
@@ -122,9 +140,9 @@ export class CollaborationService {
         const saved = await queryRunner.manager.save(collaboration);
         collaborations.push(saved);
 
-        // Send notification
+        // Send notification to the invited artist's user account
         await this.notificationsService.sendCollaborationInvite({
-          artistId: artist.id,
+          userId: artist.userId, // Use userId instead of artistId
           trackId: track.id,
           trackTitle: track.title,
           invitedBy: track.artist.artistName,
@@ -174,15 +192,20 @@ export class CollaborationService {
       throw new BadRequestException("Invitation already responded to");
     }
 
+    // Validate rejection reason if rejecting
+    if (dto.approvalStatus === ApprovalStatus.REJECTED && !dto.rejectionReason) {
+      throw new BadRequestException("Rejection reason is required when declining an invitation");
+    }
+
     collaboration.approvalStatus = dto.approvalStatus;
     collaboration.rejectionReason = dto.rejectionReason;
     collaboration.respondedAt = new Date();
 
     const updated = await this.collaborationRepo.save(collaboration);
 
-    // Notify track owner
+    // Notify track owner's user account
     await this.notificationsService.sendCollaborationResponse({
-      artistId: collaboration.track.artist.id,
+      userId: collaboration.track.artist.userId, // Use userId instead of artistId
       collaboratorName: collaboration.artist.artistName,
       trackTitle: collaboration.track.title,
       status: dto.approvalStatus,
@@ -245,26 +268,50 @@ export class CollaborationService {
     userId: string,
     collaborationId: string,
   ): Promise<void> {
-    const collaboration = await this.collaborationRepo.findOne({
-      where: { id: collaborationId },
-      relations: ["track", "track.artist"],
-    });
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (!collaboration) {
-      throw new NotFoundException("Collaboration not found");
+    try {
+      const collaboration = await queryRunner.manager.findOne(Collaboration, {
+        where: { id: collaborationId },
+        relations: ["track", "track.artist"],
+      });
+
+      if (!collaboration) {
+        throw new NotFoundException("Collaboration not found");
+      }
+
+      // Only track owner can remove collaborators
+      if (collaboration.track.artist.userId !== userId) {
+        throw new ForbiddenException("Only track owner can remove collaborators");
+      }
+
+      // Cannot remove approved collaborators if they have pending revenue
+      if (collaboration.approvalStatus === ApprovalStatus.APPROVED) {
+        // Add additional business logic here if needed
+        // For now, allow removal but log the event
+        this.eventEmitter.emit("collaboration.approved_removed", {
+          collaboration,
+          removedBy: userId,
+        });
+      }
+
+      await queryRunner.manager.remove(collaboration);
+
+      await queryRunner.commitTransaction();
+
+      this.eventEmitter.emit("collaboration.removed", {
+        collaborationId,
+        trackId: collaboration.trackId,
+        removedBy: userId,
+      });
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
-
-    // Only track owner can remove collaborators
-    if (collaboration.track.artist.userId !== userId) {
-      throw new ForbiddenException("Only track owner can remove collaborators");
-    }
-
-    await this.collaborationRepo.remove(collaboration);
-
-    this.eventEmitter.emit("collaboration.removed", {
-      collaborationId,
-      trackId: collaboration.trackId,
-    });
   }
 
   async validateSplitPercentages(trackId: string): Promise<{

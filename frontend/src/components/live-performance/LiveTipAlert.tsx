@@ -12,6 +12,7 @@ const LiveTipAlert: React.FC<LiveTipAlertProps> = ({ tip, privacyMode }) => {
 
   return (
     <div
+      role="listitem"
       className={`rounded-2xl border p-4 backdrop-blur-sm shadow-lg transition-all duration-300 animate-slide-bounce ${
         tip.isLargeTip
           ? 'border-gold bg-gold/20 shadow-gold/40'
@@ -36,4 +37,4 @@ const LiveTipAlert: React.FC<LiveTipAlertProps> = ({ tip, privacyMode }) => {
   );
 };
 
-export default LiveTipAlert;
+export default React.memo(LiveTipAlert);

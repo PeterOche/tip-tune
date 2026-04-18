@@ -7,12 +7,16 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, LessThanOrEqual, IsNull, Not } from "typeorm";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import { ScheduledRelease, ReleaseStatus } from "./entities/scheduled-release.entity";
+import {
+  ScheduledRelease,
+  ReleaseStatus,
+} from "./entities/scheduled-release.entity";
 import { PreSave } from "./entities/presave.entity";
 import { Track } from "../tracks/entities/track.entity";
 import { NotificationsService } from "../notifications/notifications.service";
 import { FollowsService } from "../follows/follows.service";
 import { NotificationType } from "@/notifications/notification.entity";
+import { DlqService } from "../queue/dlq.service";
 
 @Injectable()
 export class ScheduledReleasesService {
@@ -29,6 +33,7 @@ export class ScheduledReleasesService {
     private trackRepository: Repository<Track>,
     private notificationsService: NotificationsService,
     private followsService: FollowsService,
+    private readonly dlqService: DlqService,
   ) {}
 
   async createScheduledRelease(
@@ -169,9 +174,7 @@ export class ScheduledReleasesService {
         return;
       }
 
-      this.logger.log(
-        `Found ${releasesToPublish.length} releases to process`,
-      );
+      this.logger.log(`Found ${releasesToPublish.length} releases to process`);
 
       // Process releases with idempotency check
       for (const release of releasesToPublish) {
@@ -181,9 +184,7 @@ export class ScheduledReleasesService {
       // Clean up old failed releases
       await this.cleanupOldFailedReleases();
     } catch (error) {
-      this.logger.error(
-        `Error in scheduled release job: ${error.message}`,
-      );
+      this.logger.error(`Error in scheduled release job: ${error.message}`);
     }
   }
 
@@ -194,10 +195,7 @@ export class ScheduledReleasesService {
     release: ScheduledRelease,
   ): Promise<void> {
     // Idempotency check - skip if already processing or released
-    if (
-      release.isReleased ||
-      release.status === ReleaseStatus.PUBLISHING
-    ) {
+    if (release.isReleased || release.status === ReleaseStatus.PUBLISHING) {
       this.logger.debug(
         `Skipping release ${release.id} - already processed or publishing`,
       );
@@ -215,10 +213,7 @@ export class ScheduledReleasesService {
 
     try {
       // Mark as publishing to prevent duplicate processing
-      await this.updateReleaseStatus(
-        release.id,
-        ReleaseStatus.PUBLISHING,
-      );
+      await this.updateReleaseStatus(release.id, ReleaseStatus.PUBLISHING);
 
       this.logger.log(
         `Processing release ${release.id} (attempt ${release.retryCount + 1}/${this.maxRetries})`,
@@ -227,10 +222,7 @@ export class ScheduledReleasesService {
       await this.releaseTrack(release);
 
       // Success - mark as published
-      await this.updateReleaseStatus(
-        release.id,
-        ReleaseStatus.PUBLISHED,
-      );
+      await this.updateReleaseStatus(release.id, ReleaseStatus.PUBLISHED);
 
       this.logger.log(
         `Successfully released track ${release.track.title} (${release.trackId})`,
@@ -284,8 +276,21 @@ export class ScheduledReleasesService {
       failedAt: new Date(),
     });
 
+    // Push to DLQ with recovery metadata
+    await this.dlqService.createEntry({
+      jobType: "scheduled_release",
+      jobId: release.id,
+      payload: { trackId: release.trackId, releaseDate: release.releaseDate },
+      lastError: `Failed after ${this.maxRetries} attempts`,
+      retryCount: release.retryCount,
+      recoveryMetadata: {
+        statusBefore: release.status,
+        nextRetryAt: release.nextRetryAt ?? null,
+      },
+    });
+
     this.logger.error(
-      `Release ${release.id} marked as permanently failed`,
+      `Release ${release.id} marked as permanently failed and moved to DLQ`,
     );
   }
 
@@ -306,9 +311,7 @@ export class ScheduledReleasesService {
    * Clean up old failed releases (older than 30 days)
    */
   private async cleanupOldFailedReleases(): Promise<void> {
-    const thirtyDaysAgo = new Date(
-      Date.now() - 30 * 24 * 60 * 60 * 1000,
-    );
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     const oldFailedReleases = await this.scheduledReleaseRepository.find({
       where: {
@@ -365,9 +368,7 @@ export class ScheduledReleasesService {
     release.publishedAt = new Date();
     await this.scheduledReleaseRepository.save(release);
 
-    this.logger.log(
-      `Release ${release.id} marked as released`,
-    );
+    this.logger.log(`Release ${release.id} marked as released`);
 
     // Notify pre-savers (with error handling)
     try {

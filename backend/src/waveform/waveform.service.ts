@@ -1,8 +1,12 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { TrackWaveform, GenerationStatus } from './entities/track-waveform.entity';
-import { WaveformGeneratorService } from './waveform-generator.service';
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import {
+  TrackWaveform,
+  GenerationStatus,
+} from "./entities/track-waveform.entity";
+import { WaveformGeneratorService } from "./waveform-generator.service";
+import { DlqService } from "../queue/dlq.service";
 
 @Injectable()
 export class WaveformService {
@@ -13,25 +17,33 @@ export class WaveformService {
     @InjectRepository(TrackWaveform)
     private waveformRepository: Repository<TrackWaveform>,
     private generatorService: WaveformGeneratorService,
+    private readonly dlqService: DlqService,
   ) {}
 
-  async generateForTrack(trackId: string, audioFilePath: string, dataPoints: number = 200): Promise<TrackWaveform> {
+  async generateForTrack(
+    trackId: string,
+    audioFilePath: string,
+    dataPoints: number = 200,
+  ): Promise<TrackWaveform> {
     const startTime = Date.now();
-    
+
     await this.waveformRepository.upsert(
       {
         trackId,
         dataPoints,
         generationStatus: GenerationStatus.PROCESSING,
       },
-      ['trackId']
+      ["trackId"],
     );
-    
-    const waveform = await this.waveformRepository.findOne({ where: { trackId } });
+
+    const waveform = await this.waveformRepository.findOne({
+      where: { trackId },
+    });
 
     try {
-      const { waveformData, peakAmplitude } = await this.generatorService.generateWaveform(audioFilePath, dataPoints);
-      
+      const { waveformData, peakAmplitude } =
+        await this.generatorService.generateWaveform(audioFilePath, dataPoints);
+
       waveform.waveformData = waveformData;
       waveform.peakAmplitude = peakAmplitude;
       waveform.generationStatus = GenerationStatus.COMPLETED;
@@ -40,22 +52,39 @@ export class WaveformService {
 
       return await this.waveformRepository.save(waveform);
     } catch (error) {
-      this.logger.error(`Waveform generation failed for track ${trackId}: ${error.message}`);
-      
+      this.logger.error(
+        `Waveform generation failed for track ${trackId}: ${error.message}`,
+      );
+
       waveform.retryCount = (waveform.retryCount || 0) + 1;
-      waveform.generationStatus = waveform.retryCount > this.MAX_RETRIES 
-        ? GenerationStatus.FAILED 
+      const exhausted = waveform.retryCount > this.MAX_RETRIES;
+      waveform.generationStatus = exhausted
+        ? GenerationStatus.FAILED
         : GenerationStatus.PENDING;
-      
+
       await this.waveformRepository.save(waveform);
 
-      if (waveform.retryCount <= this.MAX_RETRIES) {
+      if (!exhausted) {
         // TODO: Replace with durable job queue (Bull/BullMQ)
         setTimeout(() => {
-          this.generateForTrack(trackId, audioFilePath, dataPoints).catch(err => {
-            this.logger.error(`Retry failed for track ${trackId}: ${err.message}`);
-          });
+          this.generateForTrack(trackId, audioFilePath, dataPoints).catch(
+            (err) => {
+              this.logger.error(
+                `Retry failed for track ${trackId}: ${err.message}`,
+              );
+            },
+          );
         }, 5000 * waveform.retryCount);
+      } else {
+        // Move exhausted job to DLQ with recovery metadata
+        await this.dlqService.createEntry({
+          jobType: "waveform_generation",
+          jobId: trackId,
+          payload: { trackId, dataPoints },
+          lastError: error.message,
+          retryCount: waveform.retryCount,
+          recoveryMetadata: { generationStatus: waveform.generationStatus },
+        });
       }
 
       throw error;
@@ -63,19 +92,23 @@ export class WaveformService {
   }
 
   async getByTrackId(trackId: string): Promise<TrackWaveform> {
-    const waveform = await this.waveformRepository.findOne({ where: { trackId } });
+    const waveform = await this.waveformRepository.findOne({
+      where: { trackId },
+    });
     if (!waveform) {
       throw new NotFoundException(`Waveform not found for track ${trackId}`);
     }
     return waveform;
   }
 
-  async getStatus(trackId: string): Promise<{ status: GenerationStatus; retryCount: number }> {
-    const waveform = await this.waveformRepository.findOne({ 
+  async getStatus(
+    trackId: string,
+  ): Promise<{ status: GenerationStatus; retryCount: number }> {
+    const waveform = await this.waveformRepository.findOne({
       where: { trackId },
-      select: ['generationStatus', 'retryCount']
+      select: ["generationStatus", "retryCount"],
     });
-    
+
     if (!waveform) {
       throw new NotFoundException(`Waveform not found for track ${trackId}`);
     }
@@ -86,14 +119,23 @@ export class WaveformService {
     };
   }
 
-  async regenerate(trackId: string, audioFilePath: string): Promise<TrackWaveform> {
-    const waveform = await this.waveformRepository.findOne({ where: { trackId } });
-    
+  async regenerate(
+    trackId: string,
+    audioFilePath: string,
+  ): Promise<TrackWaveform> {
+    const waveform = await this.waveformRepository.findOne({
+      where: { trackId },
+    });
+
     if (waveform) {
       waveform.retryCount = 0;
       await this.waveformRepository.save(waveform);
     }
 
-    return this.generateForTrack(trackId, audioFilePath, waveform?.dataPoints || 200);
+    return this.generateForTrack(
+      trackId,
+      audioFilePath,
+      waveform?.dataPoints || 200,
+    );
   }
 }

@@ -21,6 +21,7 @@ import { GenresModule } from "./genres/genres.module";
 import { ActivitiesModule } from "./activities/activities.module";
 import { FollowsModule } from "./follows/follows.module";
 import { EventEmitterModule } from "@nestjs/event-emitter";
+import { QueueModule } from "./queue/queue.module";
 import { GamificationModule } from "./gamification/gamification.module";
 import { ScheduledReleasesModule } from "./scheduled-releases/scheduled-releases.module";
 import { LeaderboardsModule } from "./leaderboards/leaderboards.module";
@@ -38,7 +39,15 @@ import { WebSocketModule } from "./websocket/websocket.module";
 import { CustomThrottlerRedisStorage } from "./custom-throttler-storage-redis";
 import { VaryAcceptEncodingMiddleware } from "./common/middleware/vary-accept-encoding.middleware";
 import { SubscriptionsModule } from "./subscription-tiers/subscriptions.module";
+import { PlayCountModule } from "./track-play-count/play-count.module";
+import { RecommendationsModule } from "./recommendations/recommendations.module";
+import { EmbedModule } from "./embed/embed.module";
+import { ReferralModule } from "./social-sharing/referral.module";
+import { PayoutsModule } from "./artiste-payout/payouts.module";
+import { CollaborationModule } from "./collaboration/collaboration.module";
 import { validate } from "./config/env.validation";
+import { AdminModule } from "./admin/admin.module";
+import { VerificationModule } from "./verification/verification.module";
 
 @Module({
   imports: [
@@ -101,7 +110,10 @@ import { validate } from "./config/env.validation";
     GamificationModule,
     EventEmitterModule.forRoot(),
     ScheduledReleasesModule,
+    // Queue module provides DLQ handling for exhausted jobs
+    QueueModule,
     LeaderboardsModule,
+    PlayCountModule,
     ReportsModule,
     FeesModule,
     ModerationModule,
@@ -113,6 +125,13 @@ import { validate } from "./config/env.validation";
     ArtistStatusModule,
     WebSocketModule,
     SubscriptionsModule,
+    RecommendationsModule,
+    EmbedModule,
+    ReferralModule,
+    PayoutsModule,
+    AdminModule,
+    VerificationModule,
+    CollaborationModule,
   ],
   controllers: [],
   providers: [

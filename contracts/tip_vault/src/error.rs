@@ -1,4 +1,4 @@
-use soroban_sdk::{contracterror, Env};
+use soroban_sdk::contracterror;
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -7,4 +7,7 @@ pub enum TipVaultError {
     NotVaultOwner = 2,
     InsufficientBalance = 3,
     ReleaseTooEarly = 4,
+    Overflow = 5,          // Amount overflow
+    Underflow = 6,         // Amount underflow
+    TimestampOverflow = 7, // Timestamp calculation overflow
 }

@@ -34,4 +34,4 @@ const HypeMeter: React.FC<HypeMeterProps> = ({ value }) => {
   );
 };
 
-export default HypeMeter;
+export default React.memo(HypeMeter);

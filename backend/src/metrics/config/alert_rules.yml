@@ -82,6 +82,16 @@ groups:
           summary: "High queue length detected"
           description: "Queue {{ $labels.queue_name }} has {{ $value }} items (threshold: 1000)"
 
+      # Dead Letter Queue Alert
+      - alert: DeadLetterQueueExhausted
+        expr: increase(dlq_exhausted_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Dead Letter Queue activity detected"
+          description: "{{ $value }} job(s) moved to DLQ in the last 5 minutes. Check dead_letters table and investigate failures."
+
       # Service Down
       - alert: ServiceDown
         expr: up == 0

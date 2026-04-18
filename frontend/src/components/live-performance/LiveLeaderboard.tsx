@@ -15,10 +15,10 @@ const LiveLeaderboard: React.FC<LiveLeaderboardProps> = ({ entries, privacyMode 
       {top.length === 0 ? (
         <p className="mt-4 text-sm text-slate-300">No tips in this session yet.</p>
       ) : (
-        <ul className="mt-3 space-y-2">
+        <ul aria-label="Session leaderboard" className="mt-3 space-y-2">
           {top.map((entry, index) => (
             <li
-              key={`${entry.tipperName}-${index}`}
+              key={entry.supporterId || `${entry.tipperName}-${entry.sortOrder}`}
               className="flex items-center justify-between rounded-lg border border-slate-700/60 bg-slate-900/40 px-3 py-2"
             >
               <div>
@@ -38,4 +38,4 @@ const LiveLeaderboard: React.FC<LiveLeaderboardProps> = ({ entries, privacyMode 
   );
 };
 
-export default LiveLeaderboard;
+export default React.memo(LiveLeaderboard);

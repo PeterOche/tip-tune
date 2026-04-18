@@ -7,6 +7,7 @@ import {
   Body,
   Req,
   UseGuards,
+  Delete,
 } from "@nestjs/common";
 import { CollaborationService } from "./collaboration.service";
 import { InviteCollaboratorDto } from "./dto/invite-collaborator.dto";
@@ -56,5 +57,32 @@ export class CollaborationController {
   @Get("tracks/:trackId")
   getTrackCollaborations(@Param("trackId") trackId: string) {
     return this.collaborationService.getTrackCollaborators(trackId);
+  }
+
+  /**
+   * Get pending invitations for current user
+   */
+  @Get("invitations/pending")
+  getPendingInvitations(@Req() req) {
+    return this.collaborationService.getPendingInvitations(req.user.id);
+  }
+
+  /**
+   * Remove a collaborator (only track owner)
+   */
+  @Delete(":collaborationId")
+  removeCollaborator(
+    @Param("collaborationId") collaborationId: string,
+    @Req() req,
+  ) {
+    return this.collaborationService.removeCollaborator(req.user.id, collaborationId);
+  }
+
+  /**
+   * Get collaboration statistics for a track
+   */
+  @Get("tracks/:trackId/stats")
+  getCollaborationStats(@Param("trackId") trackId: string) {
+    return this.collaborationService.getCollaborationStats(trackId);
   }
 }

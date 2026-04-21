@@ -1,6 +1,8 @@
 #![no_std]
 
-use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Env, Address, Vec, Symbol, String};
+use soroban_sdk::{
+    contract, contracterror, contractimpl, contracttype, Address, Env, String, Symbol, Vec,
+};
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -70,7 +72,11 @@ impl Lottery {
         let pool_key = Symbol::new(&env, "pool");
         let pool_ids_key = Symbol::new(&env, "pool_ids");
 
-        let mut pool_ids: Vec<String> = env.storage().persistent().get(&pool_ids_key).unwrap_or_else(|| Vec::new(&env));
+        let mut pool_ids: Vec<String> = env
+            .storage()
+            .persistent()
+            .get(&pool_ids_key)
+            .unwrap_or_else(|| Vec::new(&env));
 
         if pool_ids.iter().any(|p| p == pool_id) {
             return Err(LotteryError::PoolAlreadyExists);
@@ -89,7 +95,9 @@ impl Lottery {
             cancelled_at: None,
         };
 
-        env.storage().persistent().set(&(pool_key, pool_id.clone()), &pool);
+        env.storage()
+            .persistent()
+            .set(&(pool_key, pool_id.clone()), &pool);
         pool_ids.push_back(pool_id);
         env.storage().persistent().set(&pool_ids_key, &pool_ids);
 
@@ -105,7 +113,11 @@ impl Lottery {
         tipper.require_auth();
 
         let pool_key = Symbol::new(&env, "pool");
-        let mut pool: LotteryPool = env.storage().persistent().get(&(pool_key.clone(), pool_id.clone())).ok_or(LotteryError::PoolNotFound)?;
+        let mut pool: LotteryPool = env
+            .storage()
+            .persistent()
+            .get(&(pool_key.clone(), pool_id.clone()))
+            .ok_or(LotteryError::PoolNotFound)?;
 
         if pool.status != LotteryStatus::Open {
             return Err(LotteryError::LotteryNotOpen);
@@ -126,7 +138,11 @@ impl Lottery {
         }
 
         // Save entry
-        let mut entries: Vec<LotteryEntry> = env.storage().persistent().get(&pool_id).unwrap_or_else(|| Vec::new(&env));
+        let mut entries: Vec<LotteryEntry> = env
+            .storage()
+            .persistent()
+            .get(&pool_id)
+            .unwrap_or_else(|| Vec::new(&env));
         entries.push_back(LotteryEntry {
             pool_id: pool_id.clone(),
             tipper: tipper.clone(),
@@ -143,7 +159,11 @@ impl Lottery {
 
     pub fn draw_winner(env: Env, pool_id: String) -> Result<Address, LotteryError> {
         let pool_key = Symbol::new(&env, "pool");
-        let mut pool: LotteryPool = env.storage().persistent().get(&(pool_key.clone(), pool_id.clone())).ok_or(LotteryError::PoolNotFound)?;
+        let mut pool: LotteryPool = env
+            .storage()
+            .persistent()
+            .get(&(pool_key.clone(), pool_id.clone()))
+            .ok_or(LotteryError::PoolNotFound)?;
 
         if pool.status != LotteryStatus::Open {
             return Err(LotteryError::LotteryNotOpen);
@@ -153,7 +173,11 @@ impl Lottery {
             return Err(LotteryError::LotteryNotDrawingTime);
         }
 
-        let entries: Vec<LotteryEntry> = env.storage().persistent().get(&pool_id).unwrap_or_else(|| Vec::new(&env));
+        let entries: Vec<LotteryEntry> = env
+            .storage()
+            .persistent()
+            .get(&pool_id)
+            .unwrap_or_else(|| Vec::new(&env));
         if entries.is_empty() {
             return Err(LotteryError::LotteryNotOpen);
         }
@@ -183,7 +207,11 @@ impl Lottery {
 
     pub fn cancel_lottery(env: Env, pool_id: String) -> Result<(), LotteryError> {
         let pool_key = Symbol::new(&env, "pool");
-        let mut pool: LotteryPool = env.storage().persistent().get(&(pool_key.clone(), pool_id.clone())).ok_or(LotteryError::PoolNotFound)?;
+        let mut pool: LotteryPool = env
+            .storage()
+            .persistent()
+            .get(&(pool_key.clone(), pool_id.clone()))
+            .ok_or(LotteryError::PoolNotFound)?;
 
         pool.artist.require_auth();
 
@@ -203,14 +231,22 @@ impl Lottery {
         tipper.require_auth();
 
         let pool_key = Symbol::new(&env, "pool");
-        let pool: LotteryPool = env.storage().persistent().get(&(pool_key.clone(), pool_id.clone())).ok_or(LotteryError::PoolNotFound)?;
+        let pool: LotteryPool = env
+            .storage()
+            .persistent()
+            .get(&(pool_key.clone(), pool_id.clone()))
+            .ok_or(LotteryError::PoolNotFound)?;
 
         if pool.status != LotteryStatus::Cancelled {
             return Err(LotteryError::NoRefundAvailable);
         }
 
-        let entries: Vec<LotteryEntry> = env.storage().persistent().get(&pool_id).ok_or(LotteryError::PoolNotFound)?;
-        
+        let entries: Vec<LotteryEntry> = env
+            .storage()
+            .persistent()
+            .get(&pool_id)
+            .ok_or(LotteryError::PoolNotFound)?;
+
         let mut refund_amount = 0;
         let mut found = false;
         let mut new_entries = Vec::new(&env);
@@ -237,7 +273,11 @@ impl Lottery {
         caller.require_auth();
 
         let pool_key = Symbol::new(&env, "pool");
-        let mut pool: LotteryPool = env.storage().persistent().get(&(pool_key.clone(), pool_id.clone())).ok_or(LotteryError::PoolNotFound)?;
+        let mut pool: LotteryPool = env
+            .storage()
+            .persistent()
+            .get(&(pool_key.clone(), pool_id.clone()))
+            .ok_or(LotteryError::PoolNotFound)?;
 
         if pool.status != LotteryStatus::Completed {
             return Err(LotteryError::InvalidStatus);

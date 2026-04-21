@@ -1,6 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, Symbol, Vec};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -55,7 +55,7 @@ pub struct RewardToken;
 #[contractimpl]
 impl RewardToken {
     /// Initialize the reward token with admin, total supply, and optional supply cap.
-    /// 
+    ///
     /// # Arguments
     /// * `admin` - The admin address with administrative privileges
     /// * `total_supply` - Initial total supply (all minted to admin)
@@ -67,28 +67,24 @@ impl RewardToken {
         if total_supply < 0 {
             panic!("Total supply cannot be negative");
         }
-        
+
         // Validate supply cap if provided
         if let Some(cap) = supply_cap {
             if cap < total_supply {
                 panic!("Supply cap cannot be less than initial supply");
             }
         }
-        
+
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage()
             .instance()
             .set(&DataKey::TotalSupply, &total_supply);
-        env.storage()
-            .instance()
-            .set(&DataKey::Paused, &false);
-        
+        env.storage().instance().set(&DataKey::Paused, &false);
+
         if let Some(cap) = supply_cap {
-            env.storage()
-                .instance()
-                .set(&DataKey::SupplyCap, &cap);
+            env.storage().instance().set(&DataKey::SupplyCap, &cap);
         }
-        
+
         env.storage()
             .persistent()
             .set(&DataKey::Balance(admin.clone()), &total_supply);
@@ -99,36 +95,35 @@ impl RewardToken {
     /// Not allowed when contract is paused.
     pub fn transfer(env: Env, from: Address, to: Address, amount: i128) {
         from.require_auth();
-        
+
         // Check if contract is paused
         if Self::is_paused(env.clone()) {
             panic!("Contract is paused");
         }
-        
+
         if amount <= 0 {
             panic!("Amount must be positive");
         }
-        
+
         if from == to {
             panic!("Cannot transfer to self");
         }
-        
+
         let from_balance = Self::balance(env.clone(), from.clone());
         if from_balance < amount {
             panic!("Insufficient balance");
         }
-        
+
         env.storage()
             .persistent()
             .set(&DataKey::Balance(from.clone()), &(from_balance - amount));
 
         let to_balance = Self::balance(env.clone(), to.clone());
-        let new_to_balance = to_balance.checked_add(amount)
-            .expect("Balance overflow");
+        let new_to_balance = to_balance.checked_add(amount).expect("Balance overflow");
         env.storage()
             .persistent()
             .set(&DataKey::Balance(to.clone()), &new_to_balance);
-        
+
         // Emit transfer event
         env.events().publish(
             ("transfer",),
@@ -155,41 +150,44 @@ impl RewardToken {
     pub fn mint_reward(env: Env, recipient: Address, amount: i128) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         admin.require_auth();
-        
+
         // Check if contract is paused
         if Self::is_paused(env.clone()) {
             panic!("Cannot mint while paused");
         }
-        
+
         if amount <= 0 {
             panic!("Amount must be positive");
         }
-        
-        let current_supply: i128 = env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0);
-        
+
+        let current_supply: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::TotalSupply)
+            .unwrap_or(0);
+
         // Check supply cap if configured
         if let Some(cap_entry) = env.storage().instance().get::<_, i128>(&DataKey::SupplyCap) {
-            let new_supply = current_supply.checked_add(amount)
-                .expect("Supply overflow");
+            let new_supply = current_supply.checked_add(amount).expect("Supply overflow");
             if new_supply > cap_entry {
                 panic!("Minting would exceed supply cap");
             }
         }
-        
+
         let recipient_balance = Self::balance(env.clone(), recipient.clone());
-        let new_recipient_balance = recipient_balance.checked_add(amount)
+        let new_recipient_balance = recipient_balance
+            .checked_add(amount)
             .expect("Balance overflow");
         env.storage()
             .persistent()
             .set(&DataKey::Balance(recipient.clone()), &new_recipient_balance);
 
         // Update total supply
-        let new_supply = current_supply.checked_add(amount)
-            .expect("Supply overflow");
+        let new_supply = current_supply.checked_add(amount).expect("Supply overflow");
         env.storage()
             .instance()
             .set(&DataKey::TotalSupply, &new_supply);
-        
+
         // Emit mint event
         env.events().publish(
             ("mint",),
@@ -204,28 +202,31 @@ impl RewardToken {
     /// Requires authorization from the token holder.
     pub fn burn(env: Env, from: Address, amount: i128) {
         from.require_auth();
-        
+
         if amount <= 0 {
             panic!("Amount must be positive");
         }
-        
+
         let from_balance = Self::balance(env.clone(), from.clone());
         if from_balance < amount {
             panic!("Insufficient balance");
         }
-        
+
         env.storage()
             .persistent()
             .set(&DataKey::Balance(from.clone()), &(from_balance - amount));
 
         // Update total supply
-        let total_supply: i128 = env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0);
-        let new_supply = total_supply.checked_sub(amount)
-            .expect("Supply underflow");
+        let total_supply: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::TotalSupply)
+            .unwrap_or(0);
+        let new_supply = total_supply.checked_sub(amount).expect("Supply underflow");
         env.storage()
             .instance()
             .set(&DataKey::TotalSupply, &new_supply);
-        
+
         // Emit burn event
         env.events().publish(
             ("burn",),
@@ -239,15 +240,15 @@ impl RewardToken {
     /// Approve a spender to transfer tokens on behalf of the token holder.
     pub fn approve(env: Env, from: Address, spender: Address, amount: i128) {
         from.require_auth();
-        
+
         if amount < 0 {
             panic!("Amount cannot be negative");
         }
-        
+
         if from == spender {
             panic!("Cannot approve self");
         }
-        
+
         env.storage()
             .persistent()
             .set(&DataKey::Allowance(from, spender), &amount);
@@ -267,52 +268,48 @@ impl RewardToken {
     /// Not allowed when contract is paused.
     pub fn transfer_from(env: Env, spender: Address, from: Address, to: Address, amount: i128) {
         spender.require_auth();
-        
+
         // Check if contract is paused
         if Self::is_paused(env.clone()) {
             panic!("Contract is paused");
         }
-        
+
         if amount <= 0 {
             panic!("Amount must be positive");
         }
-        
+
         if from == to {
             panic!("Cannot transfer to self");
         }
-        
+
         let allowance = Self::allowance(env.clone(), from.clone(), spender.clone());
         if allowance < amount {
             panic!("Insufficient allowance");
         }
-        
+
         let from_balance = Self::balance(env.clone(), from.clone());
         if from_balance < amount {
             panic!("Insufficient balance");
         }
 
         // Update allowance
-        let new_allowance = allowance.checked_sub(amount)
-            .expect("Allowance underflow");
-        env.storage().persistent().set(
-            &DataKey::Allowance(from.clone(), spender),
-            &new_allowance,
-        );
-        
+        let new_allowance = allowance.checked_sub(amount).expect("Allowance underflow");
+        env.storage()
+            .persistent()
+            .set(&DataKey::Allowance(from.clone(), spender), &new_allowance);
+
         // Update balances
-        let new_from_balance = from_balance.checked_sub(amount)
-            .expect("Balance underflow");
+        let new_from_balance = from_balance.checked_sub(amount).expect("Balance underflow");
         env.storage()
             .persistent()
             .set(&DataKey::Balance(from.clone()), &new_from_balance);
 
         let to_balance = Self::balance(env.clone(), to.clone());
-        let new_to_balance = to_balance.checked_add(amount)
-            .expect("Balance overflow");
+        let new_to_balance = to_balance.checked_add(amount).expect("Balance overflow");
         env.storage()
             .persistent()
             .set(&DataKey::Balance(to.clone()), &new_to_balance);
-        
+
         // Emit transfer event
         env.events().publish(
             ("transfer",),
@@ -330,31 +327,30 @@ impl RewardToken {
     pub fn admin_transfer(env: Env, from: Address, to: Address, amount: i128) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         admin.require_auth();
-        
+
         if amount <= 0 {
             panic!("Amount must be positive");
         }
-        
+
         if from == to {
             panic!("Cannot transfer to self");
         }
-        
+
         let from_balance = Self::balance(env.clone(), from.clone());
         if from_balance < amount {
             panic!("Insufficient balance");
         }
-        
+
         env.storage()
             .persistent()
             .set(&DataKey::Balance(from.clone()), &(from_balance - amount));
 
         let to_balance = Self::balance(env.clone(), to.clone());
-        let new_to_balance = to_balance.checked_add(amount)
-            .expect("Balance overflow");
+        let new_to_balance = to_balance.checked_add(amount).expect("Balance overflow");
         env.storage()
             .persistent()
             .set(&DataKey::Balance(to.clone()), &new_to_balance);
-        
+
         // Emit admin transfer event
         env.events().publish(
             ("admin_transfer",),
@@ -368,7 +364,10 @@ impl RewardToken {
 
     /// Get the current total supply.
     pub fn total_supply(env: Env) -> i128 {
-        env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0)
+        env.storage()
+            .instance()
+            .get(&DataKey::TotalSupply)
+            .unwrap_or(0)
     }
 
     /// Get the supply cap (if configured).
@@ -386,18 +385,12 @@ impl RewardToken {
     pub fn pause(env: Env) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         admin.require_auth();
-        
-        env.storage()
-            .instance()
-            .set(&DataKey::Paused, &true);
-        
+
+        env.storage().instance().set(&DataKey::Paused, &true);
+
         // Emit pause event
-        env.events().publish(
-            ("pause",),
-            PauseEvent {
-                paused: true,
-            },
-        );
+        env.events()
+            .publish(("pause",), PauseEvent { paused: true });
     }
 
     /// Unpause the contract.
@@ -405,24 +398,22 @@ impl RewardToken {
     pub fn unpause(env: Env) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         admin.require_auth();
-        
-        env.storage()
-            .instance()
-            .set(&DataKey::Paused, &false);
-        
+
+        env.storage().instance().set(&DataKey::Paused, &false);
+
         // Emit unpause event
-        env.events().publish(
-            ("unpause",),
-            PauseEvent {
-                paused: false,
-            },
-        );
+        env.events()
+            .publish(("unpause",), PauseEvent { paused: false });
     }
 
     /// Check if the contract is paused.
     pub fn is_paused(env: Env) -> bool {
-        env.storage().instance().get(&DataKey::Paused).unwrap_or(false)
+        env.storage()
+            .instance()
+            .get(&DataKey::Paused)
+            .unwrap_or(false)
     }
 }
 
+#[cfg(test)]
 mod test;

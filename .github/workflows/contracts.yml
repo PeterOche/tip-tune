@@ -41,7 +41,7 @@ jobs:
         working-directory: contracts
         run: |
           set -euo pipefail
-          skip_pattern='^\./(lottery|track_access_control|tip_vault)$'
+          skip_pattern='^\./lottery$'
           while IFS= read -r manifest; do
             dir=$(dirname "$manifest")
             if [[ "$dir" =~ $skip_pattern ]]; then
@@ -50,13 +50,13 @@ jobs:
             fi
             echo "Testing $dir"
             (cd "$dir" && cargo test --verbose)
-          done < <(find . -name Cargo.toml -not -path '*/target/*' | sort)
+          done < <(find . -mindepth 2 -name Cargo.toml -not -path '*/target/*' | sort)
 
       - name: Build All Contracts
         working-directory: contracts
         run: |
           set -euo pipefail
-          skip_pattern='^\./(lottery|track_access_control|tip_vault)$'
+          skip_pattern='^\./lottery$'
           while IFS= read -r manifest; do
             dir=$(dirname "$manifest")
             if [[ "$dir" =~ $skip_pattern ]]; then
@@ -65,13 +65,13 @@ jobs:
             fi
             echo "Building $dir"
             (cd "$dir" && cargo build --target wasm32-unknown-unknown --release)
-          done < <(find . -name Cargo.toml -not -path '*/target/*' | sort)
+          done < <(find . -mindepth 2 -name Cargo.toml -not -path '*/target/*' | sort)
 
       - name: Lint All Contracts
         working-directory: contracts
         run: |
           set -euo pipefail
-          skip_pattern='^\./(lottery|track_access_control|tip_vault)$'
+          skip_pattern='^\./lottery$'
           while IFS= read -r manifest; do
             dir=$(dirname "$manifest")
             if [[ "$dir" =~ $skip_pattern ]]; then
@@ -81,4 +81,4 @@ jobs:
             echo "Linting $dir"
             (cd "$dir" && cargo clippy -- -D warnings)
             (cd "$dir" && cargo fmt -- --check)
-          done < <(find . -name Cargo.toml -not -path '*/target/*' | sort)
+          done < <(find . -mindepth 2 -name Cargo.toml -not -path '*/target/*' | sort)

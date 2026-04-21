@@ -112,7 +112,11 @@ impl AutoRoyaltyDistribution {
         asset: Asset,
     ) -> Result<Vec<(Address, i128)>, Error> {
         // Duplicate prevention
-        if env.storage().persistent().has(&DataKey::Settled(payout_id.clone())) {
+        if env
+            .storage()
+            .persistent()
+            .has(&DataKey::Settled(payout_id.clone()))
+        {
             return Err(Error::AlreadySettled);
         }
 
@@ -132,7 +136,7 @@ impl AutoRoyaltyDistribution {
 
         for i in 0..count {
             let collab = collaborators.get(i).unwrap();
-            
+
             let share = if i == (count - 1) {
                 // Last collaborator gets the remainder
                 amount.checked_sub(distributed).ok_or(Error::Underflow)?
@@ -145,13 +149,13 @@ impl AutoRoyaltyDistribution {
             };
 
             distributions.push_back((collab.address.clone(), share));
-            distributed = distributed
-                .checked_add(share)
-                .ok_or(Error::Overflow)?;
+            distributed = distributed.checked_add(share).ok_or(Error::Overflow)?;
         }
 
         // Mark as settled
-        env.storage().persistent().set(&DataKey::Settled(payout_id.clone()), &true);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Settled(payout_id.clone()), &true);
 
         // Record history
         let record = DistributionRecord {
@@ -163,16 +167,33 @@ impl AutoRoyaltyDistribution {
             timestamp: env.ledger().timestamp(),
         };
 
-        let log_idx: u32 = env.storage().persistent().get(&DataKey::LogCount(track_id.clone())).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::DistributionLog(track_id.clone(), log_idx), &record);
-        env.storage().persistent().set(&DataKey::LogCount(track_id.clone()), &(log_idx + 1));
+        let log_idx: u32 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::LogCount(track_id.clone()))
+            .unwrap_or(0);
+        env.storage().persistent().set(
+            &DataKey::DistributionLog(track_id.clone(), log_idx),
+            &record,
+        );
+        env.storage()
+            .persistent()
+            .set(&DataKey::LogCount(track_id.clone()), &(log_idx + 1));
 
-        let global_count: u64 = env.storage().instance().get(&DataKey::GlobalLogCount).unwrap_or(0);
-        env.storage().instance().set(&DataKey::GlobalLogCount, &(global_count + 1));
+        let global_count: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::GlobalLogCount)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DataKey::GlobalLogCount, &(global_count + 1));
 
         // Emit distribution event
-        env.events()
-            .publish((symbol_short!("royalty"), symbol_short!("dist"), payout_id), record);
+        env.events().publish(
+            (symbol_short!("royalty"), symbol_short!("dist"), payout_id),
+            record,
+        );
 
         Ok(distributions)
     }
@@ -195,15 +216,23 @@ impl AutoRoyaltyDistribution {
     }
 
     /// Query settlement result for a specific track and index
-    pub fn get_settlement_history(env: Env, track_id: String, index: u32) -> Option<DistributionRecord> {
-        env.storage().persistent().get(&DataKey::DistributionLog(track_id, index))
+    pub fn get_settlement_history(
+        env: Env,
+        track_id: String,
+        index: u32,
+    ) -> Option<DistributionRecord> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::DistributionLog(track_id, index))
     }
 
     /// Get total settlement count for a track
     pub fn get_settlement_count(env: Env, track_id: String) -> u32 {
-        env.storage().persistent().get(&DataKey::LogCount(track_id)).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::LogCount(track_id))
+            .unwrap_or(0)
     }
 }
 
 mod test;
-;

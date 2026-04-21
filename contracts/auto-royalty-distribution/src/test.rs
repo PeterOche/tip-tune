@@ -52,8 +52,9 @@ fn test_receive_and_distribute() {
     });
 
     client.set_splits(&track_id, &collabs);
+    let payout_id = String::from_str(&env, "payout_001");
 
-    let result = client.receive_and_distribute(&track_id, &1000, &Asset::Native);
+    let result = client.receive_and_distribute(&track_id, &payout_id, &1000, &Asset::Native);
 
     assert_eq!(result.len(), 2);
     assert_eq!(result.get(0).unwrap(), (collab1.clone(), 700));
@@ -86,9 +87,11 @@ fn test_rounding_no_loss() {
     });
 
     client.set_splits(&track_id, &collabs);
+    let payout_id = String::from_str(&env, "payout_round");
 
     let result = client.receive_and_distribute(
         &track_id,
+        &payout_id,
         &100, // Small amount to trigger rounding
         &Asset::Native,
     );
@@ -120,12 +123,16 @@ fn test_multiple_assets() {
     client.set_splits(&track_id, &collabs);
 
     // Test with Native asset
-    let result_native = client.receive_and_distribute(&track_id, &500, &Asset::Native);
+    let native_payout = String::from_str(&env, "payout_native");
+    let result_native =
+        client.receive_and_distribute(&track_id, &native_payout, &500, &Asset::Native);
     assert_eq!(result_native.get(0).unwrap(), (collab1.clone(), 500));
 
     // Test with Token asset
     let token_addr = Address::generate(&env);
-    let result_token = client.receive_and_distribute(&track_id, &750, &Asset::Token(token_addr));
+    let token_payout = String::from_str(&env, "payout_token");
+    let result_token =
+        client.receive_and_distribute(&track_id, &token_payout, &750, &Asset::Token(token_addr));
     assert_eq!(result_token.get(0).unwrap(), (collab1.clone(), 750));
 }
 
@@ -149,12 +156,26 @@ fn test_batch_distribute() {
     client.set_splits(&track2, &collabs);
 
     let mut batch = Vec::new(&env);
-    batch.push_back((track1, 1000_i128, Asset::Native));
-    batch.push_back((track2, 2000_i128, Asset::Native));
+    batch.push_back((
+        track1.clone(),
+        String::from_str(&env, "batch_1"),
+        1000_i128,
+        Asset::Native,
+    ));
+    batch.push_back((
+        track2.clone(),
+        String::from_str(&env, "batch_2"),
+        2000_i128,
+        Asset::Native,
+    ));
 
-    client.batch_distribute(&batch);
+    let results = client.batch_distribute(&batch);
 
-    assert_eq!(client.get_distribution_count(), 2);
+    assert_eq!(results.len(), 2);
+    assert!(results.get(0).unwrap());
+    assert!(results.get(1).unwrap());
+    assert_eq!(client.get_settlement_count(&track1), 1);
+    assert_eq!(client.get_settlement_count(&track2), 1);
 }
 
 #[test]
@@ -197,7 +218,7 @@ fn test_total_exceeds_100() {
     });
 
     let result = client.try_set_splits(&track_id, &collabs);
-    assert_eq!(result, Err(Ok(Error::TotalExceeds100)));
+    assert_eq!(result, Err(Ok(Error::TotalExceeds10000)));
 }
 
 #[test]
@@ -207,7 +228,8 @@ fn test_track_not_found() {
     let client = AutoRoyaltyDistributionClient::new(&env, &contract_id);
 
     let track_id = String::from_str(&env, "nonexistent");
-    let result = client.try_receive_and_distribute(&track_id, &1000, &Asset::Native);
+    let payout_id = String::from_str(&env, "missing_track");
+    let result = client.try_receive_and_distribute(&track_id, &payout_id, &1000, &Asset::Native);
     assert_eq!(result, Err(Ok(Error::TrackNotFound)));
 }
 
@@ -227,11 +249,14 @@ fn test_invalid_amount() {
     });
 
     client.set_splits(&track_id, &collabs);
+    let zero_payout = String::from_str(&env, "zero_payout");
+    let negative_payout = String::from_str(&env, "negative_payout");
 
-    let result = client.try_receive_and_distribute(&track_id, &0, &Asset::Native);
+    let result = client.try_receive_and_distribute(&track_id, &zero_payout, &0, &Asset::Native);
     assert_eq!(result, Err(Ok(Error::InvalidAmount)));
 
-    let result = client.try_receive_and_distribute(&track_id, &-100, &Asset::Native);
+    let result =
+        client.try_receive_and_distribute(&track_id, &negative_payout, &-100, &Asset::Native);
     assert_eq!(result, Err(Ok(Error::InvalidAmount)));
 }
 

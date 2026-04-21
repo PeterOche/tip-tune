@@ -1,6 +1,9 @@
 #![cfg(test)]
-use soroban_sdk::{Env, Address, String, testutils::{Address as _, Ledger as _}};
 use lottery::{Lottery, LotteryClient};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger as _},
+    Address, Env, String,
+};
 
 #[test]
 fn test_lottery_full_lifecycle() {

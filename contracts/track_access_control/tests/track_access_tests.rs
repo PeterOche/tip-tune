@@ -1,26 +1,45 @@
 #![cfg(test)]
-use soroban_sdk::{testutils::Env as _, Address, Env};
-use track_access_control::{TrackAccessControl, Error};
+use soroban_sdk::{testutils::Address as _, Address, Env, String};
+use track_access_control::{Error, TrackAccessControl, TrackAccessControlClient};
 
 #[test]
 fn test_track_gate_and_unlock() {
     let env = Env::default();
-    let artist = Address::random(&env);
-    let listener = Address::random(&env);
+    env.mock_all_auths();
 
-    // Set gate
-    TrackAccessControl::set_track_access(env.clone(), artist.clone(), "track1".to_string(), 50).unwrap();
+    let artist = Address::generate(&env);
+    let listener = Address::generate(&env);
+    let contract_id = env.register_contract(None, TrackAccessControl);
+    let client = TrackAccessControlClient::new(&env, &contract_id);
+    let track_id = String::from_str(&env, "track1");
 
-    // Unlock with insufficient tip
-    let result = TrackAccessControl::unlock_track(env.clone(), listener.clone(), "track1".to_string(), 30);
-    assert_eq!(result, Err(Error::TipTooLow));
+    client.set_track_access(&artist, &track_id, &50);
 
-    // Unlock with sufficient tip
-    assert_eq!(TrackAccessControl::unlock_track(env.clone(), listener.clone(), "track1".to_string(), 50), Ok(true));
+    let result = client.try_unlock_track(&listener, &track_id, &30);
+    assert_eq!(result, Err(Ok(Error::TipTooLow)));
 
-    // Check access
-    assert!(TrackAccessControl::check_access(env.clone(), listener.clone(), "track1".to_string()));
+    assert!(client.unlock_track(&listener, &track_id, &50));
 
-    // Remove gate
-    assert_eq!(TrackAccessControl::remove_gate(env.clone(), artist.clone(), "track1".to_string()), Ok(()));
+    assert!(client.check_access(&listener, &track_id));
+
+    client.remove_gate(&artist, &track_id);
+    let another_listener = Address::generate(&env);
+    assert!(client.check_access(&another_listener, &track_id));
+}
+
+#[test]
+fn test_only_track_owner_can_update_gate() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let artist = Address::generate(&env);
+    let other_artist = Address::generate(&env);
+    let contract_id = env.register_contract(None, TrackAccessControl);
+    let client = TrackAccessControlClient::new(&env, &contract_id);
+    let track_id = String::from_str(&env, "track2");
+
+    client.set_track_access(&artist, &track_id, &100);
+
+    let result = client.try_set_track_access(&other_artist, &track_id, &200);
+    assert_eq!(result, Err(Ok(Error::Unauthorized)));
 }

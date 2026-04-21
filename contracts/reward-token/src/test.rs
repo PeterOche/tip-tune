@@ -3,11 +3,15 @@
 use super::*;
 use soroban_sdk::{testutils::Address as _, Env};
 
+fn register_client<'a>(env: &'a Env) -> RewardTokenClient<'a> {
+    let contract_id = env.register_contract(None, RewardToken);
+    RewardTokenClient::new(env, &contract_id)
+}
+
 #[test]
 fn test_basic_operations() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, RewardToken);
-    let client = RewardTokenClient::new(&env, &contract_id);
+    let client = register_client(&env);
 
     let admin = Address::generate(&env);
     let user1 = Address::generate(&env);
@@ -60,14 +64,13 @@ fn test_basic_operations() {
 #[test]
 fn test_supply_cap() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, RewardToken);
-    let client = RewardTokenClient::new(&env, &contract_id);
+    let client = register_client(&env);
 
     let admin = Address::generate(&env);
     let user1 = Address::generate(&env);
 
     env.mock_all_auths();
-    
+
     // Initialize with supply cap
     client.initialize(&admin, &1000, &Some(2000));
     assert_eq!(client.supply_cap(), Some(2000));
@@ -77,36 +80,40 @@ fn test_supply_cap() {
     client.mint_reward(&user1, &900);
     assert_eq!(client.balance(&user1), 900);
     assert_eq!(client.total_supply(), 1900);
-
-    // Should not be able to mint beyond the cap
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.mint_reward(&user1, &200);
-    }));
-    assert!(result.is_err());
 }
 
 #[test]
+#[should_panic]
+fn test_supply_cap_panics_when_exceeded() {
+    let env = Env::default();
+    let client = register_client(&env);
+
+    let admin = Address::generate(&env);
+    let user1 = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.initialize(&admin, &1000, &Some(2000));
+    client.mint_reward(&user1, &900);
+
+    client.mint_reward(&user1, &200);
+}
+
+#[test]
+#[should_panic]
 fn test_supply_cap_validation_on_init() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, RewardToken);
-    let client = RewardTokenClient::new(&env, &contract_id);
+    let client = register_client(&env);
 
     let admin = Address::generate(&env);
 
     env.mock_all_auths();
-    
-    // Should panic if supply cap is less than initial supply
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.initialize(&admin, &2000, &Some(1000));
-    }));
-    assert!(result.is_err());
+    client.initialize(&admin, &2000, &Some(1000));
 }
 
 #[test]
 fn test_pause_functionality() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, RewardToken);
-    let client = RewardTokenClient::new(&env, &contract_id);
+    let client = register_client(&env);
 
     let admin = Address::generate(&env);
     let user1 = Address::generate(&env);
@@ -114,39 +121,51 @@ fn test_pause_functionality() {
     env.mock_all_auths();
     client.initialize(&admin, &1000, &None);
 
-    // Should not be paused initially
     assert_eq!(client.is_paused(), false);
-
-    // Admin pauses the contract
     client.pause();
     assert_eq!(client.is_paused(), true);
-
-    // Transfer should fail when paused
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.transfer(&admin, &user1, &100);
-    }));
-    assert!(result.is_err());
-
-    // Mint should fail when paused
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.mint_reward(&user1, &100);
-    }));
-    assert!(result.is_err());
-
-    // Admin unpauses the contract
     client.unpause();
     assert_eq!(client.is_paused(), false);
-
-    // Transfer should succeed now
     client.transfer(&admin, &user1, &100);
     assert_eq!(client.balance(&user1), 100);
 }
 
 #[test]
+#[should_panic]
+fn test_transfer_panics_while_paused() {
+    let env = Env::default();
+    let client = register_client(&env);
+
+    let admin = Address::generate(&env);
+    let user1 = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.initialize(&admin, &1000, &None);
+    client.pause();
+
+    client.transfer(&admin, &user1, &100);
+}
+
+#[test]
+#[should_panic]
+fn test_mint_panics_while_paused() {
+    let env = Env::default();
+    let client = register_client(&env);
+
+    let admin = Address::generate(&env);
+    let user1 = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.initialize(&admin, &1000, &None);
+    client.pause();
+
+    client.mint_reward(&user1, &100);
+}
+
+#[test]
 fn test_admin_transfer() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, RewardToken);
-    let client = RewardTokenClient::new(&env, &contract_id);
+    let client = register_client(&env);
 
     let admin = Address::generate(&env);
     let user1 = Address::generate(&env);
@@ -171,8 +190,7 @@ fn test_admin_transfer() {
 #[test]
 fn test_allowance_edge_cases() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, RewardToken);
-    let client = RewardTokenClient::new(&env, &contract_id);
+    let client = register_client(&env);
 
     let admin = Address::generate(&env);
     let user1 = Address::generate(&env);
@@ -192,19 +210,13 @@ fn test_allowance_edge_cases() {
     client.transfer_from(&user2, &user1, &admin, &500);
     assert_eq!(client.balance(&user1), 0);
     assert_eq!(client.allowance(&user1, &user2), 0);
-
-    // Try to transfer_from with zero allowance (should fail)
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.transfer_from(&user2, &user1, &admin, &1);
-    }));
-    assert!(result.is_err());
 }
 
 #[test]
-fn test_zero_and_negative_amounts() {
+#[should_panic]
+fn test_transfer_from_panics_without_allowance() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, RewardToken);
-    let client = RewardTokenClient::new(&env, &contract_id);
+    let client = register_client(&env);
 
     let admin = Address::generate(&env);
     let user1 = Address::generate(&env);
@@ -212,105 +224,94 @@ fn test_zero_and_negative_amounts() {
 
     env.mock_all_auths();
     client.initialize(&admin, &1000, &None);
+    client.transfer(&admin, &user1, &500);
+    client.approve(&user1, &user2, &500);
+    client.transfer_from(&user2, &user1, &admin, &500);
 
-    // Zero transfer should fail
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.transfer(&admin, &user1, &0);
-    }));
-    assert!(result.is_err());
-
-    // Negative transfer should fail
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.transfer(&admin, &user1, &-100);
-    }));
-    assert!(result.is_err());
-
-    // Zero mint should fail
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.mint_reward(&user1, &0);
-    }));
-    assert!(result.is_err());
-
-    // Zero burn should fail
-    client.transfer(&admin, &user1, &100);
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.burn(&user1, &0);
-    }));
-    assert!(result.is_err());
-
-    // Zero approve is allowed (clearing allowance)
-    client.approve(&admin, &user2, &100);
-    client.approve(&admin, &user2, &0);
-    assert_eq!(client.allowance(&admin, &user2), 0);
+    client.transfer_from(&user2, &user1, &admin, &1);
 }
 
 #[test]
-fn test_transfer_to_self_prevention() {
+fn test_zero_approve_clears_allowance() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, RewardToken);
-    let client = RewardTokenClient::new(&env, &contract_id);
-
-    let admin = Address::generate(&env);
-
-    env.mock_all_auths();
-    client.initialize(&admin, &1000, &None);
-
-    // Should not allow transfer to self
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.transfer(&admin, &admin, &100);
-    }));
-    assert!(result.is_err());
-
-    // Should not allow self-approval
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.approve(&admin, &admin, &100);
-    }));
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_insufficient_balance_and_allowance() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, RewardToken);
-    let client = RewardTokenClient::new(&env, &contract_id);
+    let client = register_client(&env);
 
     let admin = Address::generate(&env);
     let user1 = Address::generate(&env);
-    let user2 = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.initialize(&admin, &1000, &None);
+    client.approve(&admin, &user1, &100);
+    client.approve(&admin, &user1, &0);
+
+    assert_eq!(client.allowance(&admin, &user1), 0);
+}
+
+#[test]
+#[should_panic]
+fn test_zero_transfer_panics() {
+    let env = Env::default();
+    let client = register_client(&env);
+
+    let admin = Address::generate(&env);
+    let user1 = Address::generate(&env);
 
     env.mock_all_auths();
     client.initialize(&admin, &1000, &None);
 
+    client.transfer(&admin, &user1, &0);
+}
+
+#[test]
+#[should_panic]
+fn test_negative_transfer_panics() {
+    let env = Env::default();
+    let client = register_client(&env);
+
+    let admin = Address::generate(&env);
+    let user1 = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.initialize(&admin, &1000, &None);
+
+    client.transfer(&admin, &user1, &-100);
+}
+
+#[test]
+#[should_panic]
+fn test_zero_mint_panics() {
+    let env = Env::default();
+    let client = register_client(&env);
+
+    let admin = Address::generate(&env);
+    let user1 = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.initialize(&admin, &1000, &None);
+
+    client.mint_reward(&user1, &0);
+}
+
+#[test]
+#[should_panic]
+fn test_zero_burn_panics() {
+    let env = Env::default();
+    let client = register_client(&env);
+
+    let admin = Address::generate(&env);
+    let user1 = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.initialize(&admin, &1000, &None);
     client.transfer(&admin, &user1, &100);
 
-    // Try to transfer more than balance
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.transfer(&user1, &user2, &200);
-    }));
-    assert!(result.is_err());
-
-    // Approve allowance
-    client.approve(&user1, &user2, &100);
-
-    // Try to transfer_from more than allowance
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.transfer_from(&user2, &user1, &admin, &150);
-    }));
-    assert!(result.is_err());
-
-    // Try to transfer_from more than balance (even if allowance exists)
-    client.approve(&user1, &user2, &150);
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.transfer_from(&user2, &user1, &admin, &150);
-    }));
-    assert!(result.is_err());
+    client.burn(&user1, &0);
 }
 
 #[test]
 fn test_burn_reduces_supply() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, RewardToken);
-    let client = RewardTokenClient::new(&env, &contract_id);
+    let client = register_client(&env);
 
     let admin = Address::generate(&env);
     let user1 = Address::generate(&env);
@@ -329,10 +330,90 @@ fn test_burn_reduces_supply() {
 }
 
 #[test]
+#[should_panic]
+fn test_transfer_to_self_panics() {
+    let env = Env::default();
+    let client = register_client(&env);
+
+    let admin = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.initialize(&admin, &1000, &None);
+
+    client.transfer(&admin, &admin, &100);
+}
+
+#[test]
+#[should_panic]
+fn test_approve_self_panics() {
+    let env = Env::default();
+    let client = register_client(&env);
+
+    let admin = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.initialize(&admin, &1000, &None);
+
+    client.approve(&admin, &admin, &100);
+}
+
+#[test]
+#[should_panic]
+fn test_transfer_panics_with_insufficient_balance() {
+    let env = Env::default();
+    let client = register_client(&env);
+
+    let admin = Address::generate(&env);
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.initialize(&admin, &1000, &None);
+    client.transfer(&admin, &user1, &100);
+
+    client.transfer(&user1, &user2, &200);
+}
+
+#[test]
+#[should_panic]
+fn test_transfer_from_panics_with_insufficient_allowance() {
+    let env = Env::default();
+    let client = register_client(&env);
+
+    let admin = Address::generate(&env);
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.initialize(&admin, &1000, &None);
+    client.transfer(&admin, &user1, &100);
+    client.approve(&user1, &user2, &100);
+
+    client.transfer_from(&user2, &user1, &admin, &150);
+}
+
+#[test]
+#[should_panic]
+fn test_transfer_from_panics_with_insufficient_balance() {
+    let env = Env::default();
+    let client = register_client(&env);
+
+    let admin = Address::generate(&env);
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.initialize(&admin, &1000, &None);
+    client.transfer(&admin, &user1, &100);
+    client.approve(&user1, &user2, &150);
+
+    client.transfer_from(&user2, &user1, &admin, &150);
+}
+
+#[test]
 fn test_multiple_operations_consistency() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, RewardToken);
-    let client = RewardTokenClient::new(&env, &contract_id);
+    let client = register_client(&env);
 
     let admin = Address::generate(&env);
     let user1 = Address::generate(&env);
@@ -342,34 +423,41 @@ fn test_multiple_operations_consistency() {
     env.mock_all_auths();
     client.initialize(&admin, &10000, &Some(15000));
 
-    // Complex sequence of operations
     client.transfer(&admin, &user1, &3000);
     client.transfer(&admin, &user2, &2000);
     client.mint_reward(&user3, &1000);
-    
+
     assert_eq!(client.total_supply(), 11000);
-    assert_eq!(client.balance(&admin), 4000);
+    assert_eq!(client.balance(&admin), 5000);
     assert_eq!(client.balance(&user1), 3000);
     assert_eq!(client.balance(&user2), 2000);
     assert_eq!(client.balance(&user3), 1000);
 
-    // User1 approves user2
     client.approve(&user1, &user2, &2000);
     client.transfer_from(&user2, &user1, &user3, &1000);
-    
+
     assert_eq!(client.balance(&user1), 2000);
     assert_eq!(client.balance(&user3), 2000);
     assert_eq!(client.allowance(&user1, &user2), 1000);
     assert_eq!(client.total_supply(), 11000);
 
-    // User1 burns some
     client.burn(&user1, &500);
     assert_eq!(client.balance(&user1), 1500);
     assert_eq!(client.total_supply(), 10500);
+}
 
-    // Still can't exceed supply cap
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        client.mint_reward(&user1, &5000);
-    }));
-    assert!(result.is_err());
+#[test]
+#[should_panic]
+fn test_multiple_operations_panics_when_exceeding_supply_cap() {
+    let env = Env::default();
+    let client = register_client(&env);
+
+    let admin = Address::generate(&env);
+    let user1 = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.initialize(&admin, &10000, &Some(15000));
+    client.mint_reward(&user1, &1000);
+
+    client.mint_reward(&user1, &5000);
 }

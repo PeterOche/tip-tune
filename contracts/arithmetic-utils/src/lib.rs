@@ -172,13 +172,17 @@ mod tests {
     #[test]
     fn test_calculate_percentage() {
         // 50% of 1000
-        assert_eq!(SafeArithmetic::calculate_percentage(1000, 5000, 10000), Ok(500));
+        assert_eq!(
+            SafeArithmetic::calculate_percentage(1000, 5000, 10000),
+            Ok(500)
+        );
     }
 
     #[test]
     fn test_calculate_percentage_with_remainder() {
         // 33.33% of 100 (basis points)
-        let (result, remainder) = SafeArithmetic::calculate_percentage_with_remainder(100, 3333, 10000).unwrap();
+        let (result, remainder) =
+            SafeArithmetic::calculate_percentage_with_remainder(100, 3333, 10000).unwrap();
         assert_eq!(result, 33);
         assert_eq!(remainder, 3300);
     }
@@ -197,10 +201,7 @@ mod tests {
 
     #[test]
     fn test_safe_add_timestamp() {
-        assert_eq!(
-            SafeArithmetic::safe_add_timestamp(1000, 500),
-            Ok(1500)
-        );
+        assert_eq!(SafeArithmetic::safe_add_timestamp(1000, 500), Ok(1500));
     }
 
     #[test]

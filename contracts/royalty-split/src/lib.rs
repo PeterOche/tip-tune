@@ -1,8 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env, String, Symbol,
-    Vec,
+    contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env, String, Vec,
 };
 
 #[contracterror]
@@ -65,7 +64,6 @@ impl RoyaltySplit {
     /// Safest update flow: update_collaborator_share(track_id, collab, new_share, other_collab_to_offset)
     /// but the issue says "safer update and removal flows".
     /// Let's add simple add/update and remove that check for 10000 total.
-    
     pub fn remove_collaborator(
         env: Env,
         track_id: String,
@@ -87,7 +85,7 @@ impl RoyaltySplit {
 
         if let Some(idx) = found_index {
             collaborators.remove(idx);
-            
+
             // Note: After removal, total will not be 10000.
             // The caller should call set_royalty_split again or we should enforce a redistribution.
             // Safer: only allow removal if we automatically redistribute or if we require a full update.
@@ -128,7 +126,7 @@ impl RoyaltySplit {
 
         for i in 0..collaborators_count {
             let (collab, bp) = split.get(i).unwrap();
-            
+
             let share = if i == (collaborators_count - 1) {
                 // Last collaborator gets the remainder to handle rounding errors
                 amount - total_distributed

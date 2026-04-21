@@ -22,8 +22,8 @@ pub struct RoyaltySplit {
 pub enum Error {
     InvalidAmount = 1,
     EscrowNotFound = 2,
-    Overflow = 3,         // Amount overflow in distribution
-    Underflow = 4,        // Amount underflow in distribution
+    Overflow = 3,  // Amount overflow in distribution
+    Underflow = 4, // Amount underflow in distribution
 }
 
 #[contracttype]

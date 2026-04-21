@@ -347,9 +347,9 @@ fn test_batch_add_to_allowlist() {
     let tipper3 = Address::generate(&env);
 
     let addresses = soroban_sdk::vec![&env, tipper1.clone(), tipper2.clone(), tipper3.clone()];
-    
+
     client.add_batch_to_allowlist(&artist, &addresses);
-    
+
     assert_eq!(client.is_on_allowlist(&artist, &tipper1), true);
     assert_eq!(client.is_on_allowlist(&artist, &tipper2), true);
     assert_eq!(client.is_on_allowlist(&artist, &tipper3), true);
@@ -378,7 +378,7 @@ fn test_batch_add_with_duplicate_in_batch_fails() {
     let tipper = Address::generate(&env);
 
     let addresses = soroban_sdk::vec![&env, tipper.clone(), tipper.clone()];
-    
+
     let result = client.try_add_batch_to_allowlist(&artist, &addresses);
     assert_eq!(result, Err(Ok(Error::AlreadyOnAllowlist)));
 }
@@ -399,10 +399,10 @@ fn test_batch_add_with_existing_member_fails() {
 
     // Try to batch add including already-existing member (atomicity check)
     let addresses = soroban_sdk::vec![&env, tipper2.clone(), tipper1.clone(), tipper3.clone()];
-    
+
     let result = client.try_add_batch_to_allowlist(&artist, &addresses);
     assert_eq!(result, Err(Ok(Error::AlreadyOnAllowlist)));
-    
+
     // Verify atomicity: tipper2 and tipper3 should NOT have been added
     assert_eq!(client.is_on_allowlist(&artist, &tipper2), false);
     assert_eq!(client.is_on_allowlist(&artist, &tipper3), false);
@@ -456,7 +456,7 @@ fn test_batch_remove_nonexistent_fails() {
     let tipper2 = Address::generate(&env);
 
     let addresses = soroban_sdk::vec![&env, tipper1.clone(), tipper2.clone()];
-    
+
     let result = client.try_remove_batch_from_allowlist(&artist, &addresses);
     assert_eq!(result, Err(Ok(Error::NotOnAllowlist)));
 }
@@ -478,10 +478,10 @@ fn test_batch_remove_partial_atomicity() {
 
     // Try to batch remove including non-existent member (atomicity check)
     let remove_addresses = soroban_sdk::vec![&env, tipper1.clone(), tipper3.clone()];
-    
+
     let result = client.try_remove_batch_from_allowlist(&artist, &remove_addresses);
     assert_eq!(result, Err(Ok(Error::NotOnAllowlist)));
-    
+
     // Verify atomicity: tipper1 should still be there
     assert_eq!(client.is_on_allowlist(&artist, &tipper1), true);
     assert_eq!(client.is_on_allowlist(&artist, &tipper2), true);
@@ -553,7 +553,13 @@ fn test_batch_add_then_remove_workflow() {
     client.set_allowlist_mode(&artist, &AllowlistMode::AllowlistOnly);
 
     // Batch add 4 tippers
-    let add_addresses = soroban_sdk::vec![&env, tipper1.clone(), tipper2.clone(), tipper3.clone(), tipper4.clone()];
+    let add_addresses = soroban_sdk::vec![
+        &env,
+        tipper1.clone(),
+        tipper2.clone(),
+        tipper3.clone(),
+        tipper4.clone()
+    ];
     client.add_batch_to_allowlist(&artist, &add_addresses);
 
     // All should be able to tip

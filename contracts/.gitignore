@@ -11,4 +11,5 @@ target/
 test_snapshots/
 
 # Cargo lock for libraries (keep for binaries)
+
 # Cargo.lock

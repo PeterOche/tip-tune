@@ -231,6 +231,21 @@ export class FollowsService {
   }
 
   /**
+   * Get IDs of all artists followed by a user
+   */
+  async getFollowedArtistIds(userId: string): Promise<string[]> {
+    const follows = await this.followRepo.find({
+      where: {
+        followerId: userId,
+        followingType: FollowingType.ARTIST,
+      },
+      select: ["followingId"],
+    });
+
+    return follows.map((f) => f.followingId);
+  }
+
+  /**
    * Update notification preferences for a follow relationship
    */
   async updateNotificationPreferences(

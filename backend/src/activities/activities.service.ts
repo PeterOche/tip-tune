@@ -14,6 +14,8 @@ import { EntityActivityQueryDto } from "./dto/entity-activity-query.dto";
 import { UsersService } from "../users/users.service";
 import { BlocksService } from "../blocks/blocks.service";
 import { MuteType } from "../blocks/entities/user-mute.entity";
+import { FollowsService } from "../follows/follows.service";
+import { ActivityFeedRepository } from "./activity-feed.repository";
 
 import { PaginatedResponse } from "../common/dto/paginated-response.dto";
 import { paginate } from "../common/helpers/paginate.helper";
@@ -28,6 +30,8 @@ export class ActivitiesService {
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
     private readonly blocksService: BlocksService,
+    private readonly followsService: FollowsService,
+    private readonly activityFeedRepository: ActivityFeedRepository,
   ) {}
 
   /**
@@ -60,47 +64,39 @@ export class ActivitiesService {
       MuteType.ACTIVITY_FEED,
     );
 
-    // Build query
-    const queryBuilder = this.activityRepository
-      .createQueryBuilder("activity")
-      .leftJoinAndSelect("activity.user", "user")
-      .where(
-        "(activity.userId = :userId OR activity.userId IN (:...followedArtistIds))",
-        {
-          userId,
-          followedArtistIds:
-            followedArtists.length > 0 ? followedArtists : [""],
-        },
-      )
-      .orderBy("activity.createdAt", "DESC")
-      .skip(skip)
-      .take(limit);
-
-    // Exclude muted users from activity feed
-    if (mutedUserIds.length > 0) {
-      queryBuilder.andWhere("activity.userId NOT IN (:...mutedUserIds)", {
-        mutedUserIds,
-      });
-    }
-
+    const queryBuilder = this.activityFeedRepository.createFeedQueryBuilder(
+      userId,
+      followedArtists,
+      mutedUserIds,
+    );
+ 
     // Apply filters
     if (activityType) {
       queryBuilder.andWhere("activity.activityType = :activityType", {
         activityType,
       });
     }
-
+ 
     if (unseenOnly) {
       queryBuilder.andWhere("activity.isSeen = :isSeen", { isSeen: false });
     }
 
+    queryBuilder
+      .orderBy("activity.createdAt", "DESC")
+      .skip(skip)
+      .take(limit);
+ 
     const [data, total] = await queryBuilder.getManyAndCount();
-
+ 
     // Get unseen count
-    const unseenCount = await this.getUnseenCount(userId, followedArtists);
-
+    const unseenCount = await this.activityFeedRepository.getUnseenCount(
+      userId,
+      followedArtists,
+      mutedUserIds,
+    );
+ 
     const totalPages = Math.ceil(total / limit);
-
+ 
     return new PaginatedResponse(data, {
       total,
       page,
@@ -251,17 +247,15 @@ export class ActivitiesService {
     userId: string,
     followedArtists: string[],
   ): Promise<number> {
-    const followedArtistIds =
-      followedArtists.length > 0 ? followedArtists : [""];
-
-    return this.activityRepository.count({
-      where: [
-        { userId, isSeen: false },
-        ...(followedArtists.length > 0
-          ? [{ userId: In(followedArtists), isSeen: false }]
-          : []),
-      ],
-    });
+    const mutedUserIds = await this.blocksService.getMutedUserIds(
+      userId,
+      MuteType.ACTIVITY_FEED,
+    );
+    return this.activityFeedRepository.getUnseenCount(
+      userId,
+      followedArtists,
+      mutedUserIds,
+    );
   }
 
   /**
@@ -279,11 +273,8 @@ export class ActivitiesService {
    * For now, returns empty array - follow system needs to be implemented
    */
   private async getFollowedArtists(userId: string): Promise<string[]> {
-    // TODO: Implement actual follow system
-    // For now, return empty array - users don't follow anyone yet
-    // When follow system is implemented, query the follows table
     this.logger.debug(`Getting followed artists for user: ${userId}`);
-    return [];
+    return this.followsService.getFollowedArtistIds(userId);
   }
 
   /**

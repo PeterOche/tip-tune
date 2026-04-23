@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { GoalsService } from './goals.service';
 import { GoalProgressService } from './goal-progress.service';
+import { GoalProgressRetentionService } from './goal-progress-retention.service';
 import { GoalProgressScheduler } from './goal-progress.scheduler';
 import { GoalsController } from './goals.controller';
 import { TipGoal } from './entities/tip-goal.entity';
@@ -23,7 +24,7 @@ import { ArtistsModule } from '../artists/artists.module';
     ArtistsModule,
   ],
   controllers: [GoalsController],
-  providers: [GoalsService, GoalProgressService, GoalProgressScheduler],
-  exports: [GoalsService, GoalProgressService],
+  providers: [GoalsService, GoalProgressService, GoalProgressRetentionService, GoalProgressScheduler],
+  exports: [GoalsService, GoalProgressService, GoalProgressRetentionService],
 })
 export class GoalsModule {}

@@ -33,6 +33,12 @@ export class GoalsService {
     });
   }
 
+  async findActiveGoals(): Promise<TipGoal[]> {
+    return this.goalsRepository.find({
+      where: { status: GoalStatus.ACTIVE },
+    });
+  }
+
   async findOne(id: string): Promise<TipGoal> {
     const goal = await this.goalsRepository.findOne({
       where: { id },

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { GoalProgressService } from './goal-progress.service';
+import { GoalProgressRetentionService } from './goal-progress-retention.service';
 import { GoalsService } from './goals.service';
 import { TipGoal, GoalStatus } from './entities/tip-goal.entity';
 
@@ -10,6 +11,7 @@ export class GoalProgressScheduler {
 
   constructor(
     private readonly goalProgressService: GoalProgressService,
+    private readonly goalProgressRetentionService: GoalProgressRetentionService,
     private readonly goalsService: GoalsService,
   ) {}
 
@@ -49,11 +51,9 @@ export class GoalProgressScheduler {
   @Cron(CronExpression.EVERY_WEEK)
   async cleanupOldSnapshots() {
     this.logger.log('Starting cleanup of old goal progress snapshots');
-
     try {
-      // This would be implemented to remove snapshots older than 90 days
-      // For now, just log that cleanup would happen
-      this.logger.log('Cleanup completed (placeholder implementation)');
+      const { prunedCount } = await this.goalProgressRetentionService.pruneOldSnapshots(90);
+      this.logger.log(`Cleanup completed. Removed ${prunedCount} stale snapshots.`);
     } catch (error) {
       this.logger.error('Failed to cleanup old snapshots:', error);
     }
@@ -63,9 +63,6 @@ export class GoalProgressScheduler {
    * Get all active goals for snapshot creation
    */
   private async getActiveGoals(): Promise<TipGoal[]> {
-    // This is a simplified implementation
-    // In a real scenario, you'd query the database for active goals
-    // For now, return empty array as we don't have the repository access here
-    return [];
+    return this.goalsService.findActiveGoals();
   }
 }

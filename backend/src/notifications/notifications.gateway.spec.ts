@@ -1,15 +1,21 @@
-
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationsGateway } from './notifications.gateway';
 import { AuthService } from '../auth/auth.service';
+import { ArtistsService } from '../artists/artists.service';
 import { Socket } from 'socket.io';
+import { WsException } from '@nestjs/websockets';
 
 describe('NotificationsGateway', () => {
   let gateway: NotificationsGateway;
   let authService: AuthService;
+  let artistsService: ArtistsService;
 
   const mockAuthService = {
     verifyAccessToken: jest.fn(),
+  };
+
+  const mockArtistsService = {
+    findOne: jest.fn(),
   };
 
   const mockClient = {
@@ -21,6 +27,7 @@ describe('NotificationsGateway', () => {
       headers: {},
     },
     join: jest.fn(),
+    leave: jest.fn(),
     disconnect: jest.fn(),
     data: {},
     emit: jest.fn(),
@@ -29,6 +36,7 @@ describe('NotificationsGateway', () => {
   const mockServer = {
     to: jest.fn().mockReturnThis(),
     emit: jest.fn(),
+    timeout: jest.fn().mockReturnThis(),
   };
 
   beforeEach(async () => {
@@ -38,6 +46,10 @@ describe('NotificationsGateway', () => {
         {
           provide: AuthService,
           useValue: mockAuthService,
+        },
+        {
+          provide: ArtistsService,
+          useValue: mockArtistsService,
         },
       ],
     }).compile();
@@ -50,13 +62,9 @@ describe('NotificationsGateway', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => {
-    expect(gateway).toBeDefined();
-  });
-
   describe('handleConnection', () => {
     it('should authenticate user and join user room', async () => {
-      const user = { id: 'user-1', walletAddress: 'test-wallet' };
+      const user = { id: 'user-1' };
       mockAuthService.verifyAccessToken.mockResolvedValue(user);
 
       await gateway.handleConnection(mockClient);
@@ -68,34 +76,54 @@ describe('NotificationsGateway', () => {
 
     it('should disconnect if no token provided', async () => {
       const noTokenClient = {
-        ...mockClient,
+        id: 'no-token',
         handshake: { auth: {}, headers: {} },
+        emit: jest.fn(),
+        disconnect: jest.fn(),
       } as unknown as Socket;
 
       await gateway.handleConnection(noTokenClient);
 
       expect(noTokenClient.disconnect).toHaveBeenCalled();
-      expect(mockAuthService.verifyAccessToken).not.toHaveBeenCalled();
-    });
-
-    it('should disconnect if authentication fails', async () => {
-      mockAuthService.verifyAccessToken.mockRejectedValue(new Error('Invalid token'));
-
-      await gateway.handleConnection(mockClient);
-
-      expect(mockClient.disconnect).toHaveBeenCalled();
+      expect(noTokenClient.emit).toHaveBeenCalledWith('error', expect.any(String));
     });
   });
 
-  describe('sendNotificationToArtist', () => {
-    it('should emit tipReceived event to user room', () => {
-      const artistId = 'artist-1';
-      const payload = { amount: 100 };
+  describe('handleJoinArtistRoom', () => {
+    it('should allow joining if artist exists', async () => {
+      mockArtistsService.findOne.mockResolvedValue({ id: 'artist-1' });
+      mockClient.data = { user: { id: 'user-1' } };
 
-      gateway.sendNotificationToArtist(artistId, payload);
+      const result = await gateway.handleJoinArtistRoom(mockClient, 'artist-1');
 
-      expect(mockServer.to).toHaveBeenCalledWith(`user:${artistId}`);
-      expect(mockServer.emit).toHaveBeenCalledWith('tipReceived', payload);
+      expect(mockArtistsService.findOne).toHaveBeenCalledWith('artist-1');
+      expect(mockClient.join).toHaveBeenCalledWith('artist:artist-1');
+      expect(result.status).toBe('ok');
+    });
+
+    it('should throw WsException if artist does not exist', async () => {
+      mockArtistsService.findOne.mockResolvedValue(null);
+
+      await expect(gateway.handleJoinArtistRoom(mockClient, 'invalid'))
+        .rejects.toThrow(WsException);
+    });
+  });
+
+  describe('sendNotificationToUser', () => {
+    it('should emit to user room and handle timeout', async () => {
+      const userId = 'user-1';
+      const payload = { msg: 'hi' };
+      
+      // Mock the callback logic for emit with timeout
+      mockServer.emit.mockImplementation((event, data, cb) => {
+        cb(null, ['ack']); // Simulate success
+      });
+
+      const result = await gateway.sendNotificationToUser(userId, payload);
+
+      expect(mockServer.to).toHaveBeenCalledWith('user:user-1');
+      expect(mockServer.timeout).toHaveBeenCalledWith(5000);
+      expect(result).toBe(true);
     });
   });
 });

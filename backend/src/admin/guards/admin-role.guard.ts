@@ -26,11 +26,6 @@ export class AdminRoleGuard implements CanActivate {
       PERMISSIONS_KEY,
       [context.getHandler(), context.getClass()],
     );
-
-    if (!requiredPermissions) {
-      return true;
-    }
-
     const request = context.switchToHttp().getRequest();
     const user = request.user as { userId?: string } | undefined;
 
@@ -48,6 +43,11 @@ export class AdminRoleGuard implements CanActivate {
         `Denied admin access: no admin role for userId=${user.userId}`,
       );
       throw new ForbiddenException('User does not have admin privileges');
+    }
+
+    if (!requiredPermissions) {
+      request.adminRole = adminRole;
+      return true;
     }
 
     const hasPermission = requiredPermissions.every((permission) =>

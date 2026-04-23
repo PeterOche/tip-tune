@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException, Logger } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import {
@@ -41,6 +42,7 @@ export class EventsService {
     @InjectRepository(EventRSVP)
     private readonly rsvpRepo: Repository<EventRSVP>,
     private readonly dataSource: DataSource,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   // ─── CRUD ───────────────────────────────────────────────────────────────────
@@ -315,9 +317,7 @@ export class EventsService {
         });
 
         this.logger.log(`Event ${event.id} (${event.title}) transitioned to LIVE`);
-
-        // TODO: Send notifications to RSVP attendees that event is now live
-        // await this.notifyAttendeesEventIsLive(event);
+        this.eventEmitter.emit("event.live", event);
       } catch (error) {
         this.logger.error(
           `Failed to transition event ${event.id} to LIVE: ${error.message}`,
@@ -365,9 +365,7 @@ export class EventsService {
         });
 
         this.logger.log(`Event ${event.id} (${event.title}) transitioned to ENDED`);
-
-        // TODO: Send follow-up notifications or feedback requests
-        // await this.notifyAttendeesEventEnded(event);
+        this.eventEmitter.emit("event.ended", event);
       } catch (error) {
         this.logger.error(
           `Failed to transition event ${event.id} to ENDED: ${error.message}`,
@@ -388,25 +386,35 @@ export class EventsService {
     );
 
     const oldEvents = await this.eventRepo.find({
-      where: {
-        status: EventStatus.ENDED,
-        endedAt: LessThanOrEqual(cutoffDate),
-      },
-      take: 100, // Limit to prevent performance issues
+      where: [
+        {
+          status: EventStatus.ENDED,
+          endedAt: LessThanOrEqual(cutoffDate),
+        },
+        {
+          status: EventStatus.CANCELLED,
+          updatedAt: LessThanOrEqual(cutoffDate),
+        },
+      ],
+      take: 100,
     });
 
     if (oldEvents.length === 0) {
       return 0;
     }
 
-    // For now, just log - could implement soft delete or archival
-    this.logger.log(
-      `Found ${oldEvents.length} events older than ${daysOld} days for cleanup`,
-    );
+    for (const event of oldEvents) {
+      try {
+        await this.eventRepo.update(event.id, {
+          status: EventStatus.ARCHIVED,
+        });
+        this.eventEmitter.emit("event.archived", event);
+      } catch (error) {
+        this.logger.error(`Failed to archive event ${event.id}: ${error.message}`);
+      }
+    }
 
-    // TODO: Implement archival strategy based on business requirements
-    // Options: soft delete, move to archive table, compress data, etc.
-
+    this.logger.log(`Archived ${oldEvents.length} events older than ${daysOld} days`);
     return oldEvents.length;
   }
 
@@ -433,9 +441,7 @@ export class EventsService {
     });
 
     this.logger.log(`Event ${eventId} manually cancelled`);
-
-    // TODO: Notify all RSVP attendees about cancellation
-    // await this.notifyAttendeesEventCancelled(event);
+    this.eventEmitter.emit("event.cancelled", event);
 
     return this.findOne(eventId);
   }

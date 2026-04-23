@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EventsService } from './events.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/notification.entity';
 
 /**
  * Fired every 5 minutes. Finds events starting in ~1 hour (55–65 min window)
@@ -12,8 +14,7 @@ export class EventReminderCron {
 
   constructor(
     private readonly eventsService: EventsService,
-    // Inject your NotificationsService here when available:
-    // private readonly notificationsService: NotificationsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   @Cron('*/5 * * * *') // every 5 minutes
@@ -77,13 +78,12 @@ export class EventReminderCron {
       `[REMINDER] → userId=${userId}, event="${eventTitle}" (${eventId}) at ${startTime.toISOString()}`,
     );
 
-    // Example integration point:
-    // await this.notificationsService.create({
-    //   userId,
-    //   type: NotificationType.EVENT_REMINDER,
-    //   title: `Starts in 1 hour: ${eventTitle}`,
-    //   body: `Your event "${eventTitle}" starts at ${startTime.toLocaleTimeString()}.`,
-    //   data: { eventId },
-    // });
+    await this.notificationsService.create({
+      userId,
+      type: NotificationType.EVENT_REMINDER,
+      title: `Starts in 1 hour: ${eventTitle}`,
+      message: `Your event "${eventTitle}" starts at ${startTime.toLocaleTimeString()}.`,
+      data: { eventId },
+    });
   }
 }

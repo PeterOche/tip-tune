@@ -29,11 +29,10 @@ import {
 } from './dto/assets.dto';
 import { SupportedAsset } from './entities/supported-asset.entity';
 
-// ---------------------------------------------------------------------------
-// Lightweight guard stubs – replace with your real guards
-// ---------------------------------------------------------------------------
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AdminGuard } from '../auth/guards/admin.guard';
+import { AdminRoleGuard } from '../admin/guards/admin-role.guard';
+import { RequirePermission } from '../admin/decorators/require-permission.decorator';
+import { AssetCatalogPermission } from './asset-catalog.permissions';
 
 @ApiTags('Assets')
 @ApiBearerAuth()
@@ -88,7 +87,8 @@ export class AssetsController {
   // ── Admin mutations ────────────────────────────────────────────────────────
 
   @Post()
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard, AdminRoleGuard)
+  @RequirePermission(AssetCatalogPermission.CREATE)
   @ApiOperation({ summary: '[Admin] Create a supported asset' })
   @ApiResponse({ status: 201, type: SupportedAsset })
   @ApiResponse({ status: 400, description: 'Validation / duplicate' })
@@ -97,7 +97,8 @@ export class AssetsController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard, AdminRoleGuard)
+  @RequirePermission(AssetCatalogPermission.UPDATE)
   @ApiOperation({ summary: '[Admin] Update display metadata of an asset' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, type: SupportedAsset })
@@ -109,7 +110,8 @@ export class AssetsController {
   }
 
   @Patch(':id/enable')
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard, AdminRoleGuard)
+  @RequirePermission(AssetCatalogPermission.MANAGE)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '[Admin] Enable a supported asset' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
@@ -119,7 +121,8 @@ export class AssetsController {
   }
 
   @Patch(':id/disable')
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard, AdminRoleGuard)
+  @RequirePermission(AssetCatalogPermission.MANAGE)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '[Admin] Disable a supported asset (soft-disable)' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
@@ -129,7 +132,8 @@ export class AssetsController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard, AdminRoleGuard)
+  @RequirePermission(AssetCatalogPermission.DELETE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: '[Admin] Permanently remove a supported asset' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })

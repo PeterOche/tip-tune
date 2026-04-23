@@ -48,6 +48,7 @@ import { CollaborationModule } from "./collaboration/collaboration.module";
 import { validate } from "./config/env.validation";
 import { AdminModule } from "./admin/admin.module";
 import { VerificationModule } from "./verification/verification.module";
+import { WaveformModule } from "./waveform/waveform.module";
 
 @Module({
   imports: [
@@ -132,6 +133,7 @@ import { VerificationModule } from "./verification/verification.module";
     AdminModule,
     VerificationModule,
     CollaborationModule,
+    WaveformModule,
   ],
   controllers: [],
   providers: [

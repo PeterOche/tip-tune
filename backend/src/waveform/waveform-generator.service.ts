@@ -45,6 +45,14 @@ export class WaveformGeneratorService {
     }
   }
 
+  /**
+   * Alias for generateWaveform to match processor interface.
+   */
+  async generateFromFile(audioFilePath: string, dataPoints: number = 200): Promise<{ peaks: number[]; peakAmplitude: number }> {
+    const { waveformData, peakAmplitude } = await this.generateWaveform(audioFilePath, dataPoints);
+    return { peaks: waveformData, peakAmplitude };
+  }
+
   private normalizeAndResample(data: number[], targetPoints: number, peak: number): number[] {
     if (data.length === 0) return Array(targetPoints).fill(0);
     if (peak === 0) return Array(targetPoints).fill(0);

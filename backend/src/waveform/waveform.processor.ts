@@ -7,14 +7,7 @@ import { WaveformService, WaveformJobPayload } from './waveform.service';
 import { WAVEFORM_JOBS, WAVEFORM_QUEUE } from './waveform.constants';
 
 /**
- * BullMQ worker that replaces the old `setTimeout`-based retry mechanism.
- *
- * BullMQ persists jobs in Redis, so:
- *  - Restarts do NOT lose queued or in-flight work.
- *  - Exponential back-off with a configurable number of attempts is handled
- *    by the queue, not application code.
- *  - Failed jobs remain visible in the BullMQ dashboard for inspection /
- *    manual retry without restarting the process.
+ * BullMQ worker that processes waveform generation jobs.
  */
 @Processor(WAVEFORM_QUEUE)
 export class WaveformProcessor extends WorkerHost {
@@ -33,7 +26,7 @@ export class WaveformProcessor extends WorkerHost {
       return;
     }
 
-    const { trackId, audioFilePath } = job.data;
+    const { trackId, audioFilePath, dataPoints } = job.data;
     this.logger.log(
       `Processing waveform job ${job.id} for track ${trackId} ` +
         `(attempt ${job.attemptsMade + 1} / ${job.opts.attempts})`,
@@ -45,6 +38,7 @@ export class WaveformProcessor extends WorkerHost {
     try {
       const { peaks } = await this.generatorService.generateFromFile(
         audioFilePath,
+        dataPoints
       );
       await this.waveformService.markDone(trackId, peaks);
     } catch (err: unknown) {

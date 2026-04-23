@@ -1,6 +1,7 @@
 import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthModule } from "../auth/auth.module";
+import { ArtistsModule } from "../artists/artists.module";
 import { NotificationsGateway } from "./notifications.gateway";
 import { NotificationsService } from "./notifications.service";
 import { NotificationsController } from "./notifications.controller";
@@ -11,6 +12,7 @@ import { BlocksModule } from "../blocks/blocks.module";
   imports: [
     TypeOrmModule.forFeature([Notification]),
     AuthModule,
+    ArtistsModule,
     forwardRef(() => BlocksModule),
   ],
   controllers: [NotificationsController],

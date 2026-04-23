@@ -41,7 +41,13 @@ export class TrackWaveform {
   processingDurationMs: number | null;
 
   @Column({ type: 'int', default: 0 })
-  retryCount: number;
+  attemptCount: number;
+
+  @Column({ type: 'text', nullable: true })
+  failReason: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  bullJobId: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

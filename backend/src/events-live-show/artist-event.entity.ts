@@ -23,6 +23,7 @@ export enum EventStatus {
   LIVE = 'live',
   ENDED = 'ended',
   CANCELLED = 'cancelled',
+  ARCHIVED = 'archived',
 }
 
 @Entity('artist_events')

@@ -1,40 +1,66 @@
-import { Controller, Get, Post, Param, NotFoundException, UseGuards, InternalServerErrorException } from '@nestjs/common';
-import { WaveformService } from './waveform.service';
-import { TrackWaveform } from './entities/track-waveform.entity';
-import { TracksService } from '../tracks/tracks.service';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  NotFoundException,
+  HttpCode,
+  HttpStatus,
+  ParseUUIDPipe,
+} from "@nestjs/common";
+import {
+  ApiConflictResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from "@nestjs/swagger";
+import { WaveformService } from "./waveform.service";
+import { TracksService } from "../tracks/tracks.service";
+import {
+  RegenerateResponseDto,
+  WaveformStatusDto,
+} from "./dto/waveform.dto";
 
-@Controller('waveform')
+@ApiTags("waveform")
+@Controller({ path: "tracks/:trackId/waveform", version: "1" })
 export class WaveformController {
   constructor(
     private readonly waveformService: WaveformService,
     private readonly tracksService: TracksService,
   ) {}
 
-  @Get(':trackId')
-  async getWaveform(@Param('trackId') trackId: string): Promise<TrackWaveform> {
-    return this.waveformService.getByTrackId(trackId);
-  }
-
-  @Get(':trackId/status')
-  async getStatus(@Param('trackId') trackId: string) {
+  @Get()
+  @ApiOperation({ summary: "Get waveform status and peak data for a track" })
+  @ApiOkResponse({ type: WaveformStatusDto })
+  @ApiNotFoundResponse({ description: "No waveform record exists for track" })
+  async getStatus(
+    @Param("trackId", ParseUUIDPipe) trackId: string,
+  ): Promise<WaveformStatusDto> {
     return this.waveformService.getStatus(trackId);
   }
 
-  @Post(':trackId/regenerate')
-  async regenerate(@Param('trackId') trackId: string): Promise<{ message: string }> {
+  @Post("regenerate")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Force-regenerate the waveform for a track",
+    description: "Enqueues a durable BullMQ job.",
+  })
+  @ApiOkResponse({ type: RegenerateResponseDto })
+  @ApiNotFoundResponse({ description: "No waveform record exists for track" })
+  @ApiConflictResponse({
+    description: "Waveform generation already in progress",
+  })
+  async regenerate(
+    @Param("trackId", ParseUUIDPipe) trackId: string,
+  ): Promise<RegenerateResponseDto> {
     const track = await this.tracksService.findOne(trackId);
-    
+
     if (!track.audioUrl && !track.filename) {
-      throw new NotFoundException('Track audio file not found');
+      throw new NotFoundException("Track audio file not found");
     }
 
     const audioPath = track.filename || track.audioUrl;
-
-    try {
-      await this.waveformService.regenerate(trackId, audioPath);
-      return { message: 'Waveform regeneration started' };
-    } catch (error) {
-      throw new InternalServerErrorException('Failed to regenerate waveform');
-    }
+    return this.waveformService.regenerate(trackId, audioPath);
   }
 }

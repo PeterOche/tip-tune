@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { AdminModule } from '../admin/admin.module';
 import { SupportedAsset } from './entities/supported-asset.entity';
 import { AssetsService } from './assets.service';
 import { AssetsController } from './assets.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SupportedAsset])],
+  imports: [TypeOrmModule.forFeature([SupportedAsset]), AdminModule],
   controllers: [AssetsController],
   providers: [AssetsService],
   /**

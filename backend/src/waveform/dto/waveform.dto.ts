@@ -1,18 +1,27 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { GenerationStatus } from '../entities/track-waveform.entity';
 
-export class CreateWaveformDto {
-  trackId: string;
-  dataPoints?: number;
+export class WaveformStatusDto {
+  @ApiProperty({ enum: GenerationStatus })
+  status: GenerationStatus;
+
+  @ApiProperty({ type: [Number], required: false })
+  waveformData?: number[];
+
+  @ApiProperty()
+  attempts: number;
+
+  @ApiProperty({ required: false })
+  failReason?: string;
+
+  @ApiProperty()
+  updatedAt: string;
 }
 
-export class WaveformResponseDto {
-  id: string;
-  trackId: string;
-  waveformData: number[];
-  dataPoints: number;
-  peakAmplitude: number;
-  generationStatus: GenerationStatus;
-  processingDurationMs?: number;
-  createdAt: Date;
-  updatedAt: Date;
+export class RegenerateResponseDto {
+  @ApiProperty({ example: 'queued' })
+  result: 'queued' | 'already_processing';
+
+  @ApiProperty({ required: false })
+  jobId?: string;
 }

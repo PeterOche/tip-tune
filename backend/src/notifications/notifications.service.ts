@@ -3,6 +3,7 @@ import {
   NotFoundException,
   Inject,
   forwardRef,
+  Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -12,6 +13,8 @@ import { BlocksService } from "../blocks/blocks.service";
 
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+
   constructor(
     @InjectRepository(Notification)
     private readonly notificationRepository: Repository<Notification>,
@@ -59,13 +62,18 @@ export class NotificationsService {
     const savedNotification =
       await this.notificationRepository.save(notification);
 
-    this.notificationsGateway.sendNotificationToArtist(
+    // Send private real-time notification to the user
+    this.notificationsGateway.sendNotificationToUser(
       createNotificationDto.userId,
       {
         ...savedNotification,
         type: createNotificationDto.type,
       },
-    );
+    ).then(delivered => {
+      if (!delivered) {
+        this.logger.debug(`Notification ${savedNotification.id} not delivered via WebSocket (user might be offline)`);
+      }
+    });
 
     return savedNotification;
   }
@@ -92,11 +100,16 @@ export class NotificationsService {
     const savedNotification =
       await this.notificationRepository.save(notification);
 
-    // Emit via WebSocket
-    this.notificationsGateway.sendNotificationToArtist(artistId, {
+    const payload = {
       ...savedNotification,
-      type: "TIP_RECEIVED", // Ensure frontend gets the string it expects if consistent with enum
-    });
+      type: "TIP_RECEIVED",
+    };
+
+    // 1. Send private notification to the artist
+    this.notificationsGateway.sendNotificationToUser(artistId, payload);
+
+    // 2. Broadcast to the artist's public room (for live stream UI, etc.)
+    this.notificationsGateway.sendTipEventToArtistRoom(artistId, payload);
   }
 
   async notifyUserOfBadge(userId: string, userBadge: any) {
@@ -108,7 +121,6 @@ export class NotificationsService {
       earnedAt: userBadge.earnedAt,
     };
 
-    // Save notification to DB
     const notification = this.notificationRepository.create({
       userId,
       type: NotificationType.BADGE_EARNED,
@@ -120,8 +132,8 @@ export class NotificationsService {
     const savedNotification =
       await this.notificationRepository.save(notification);
 
-    // Emit via WebSocket
-    this.notificationsGateway.sendNotificationToArtist(userId, {
+    // Private notification only
+    this.notificationsGateway.sendNotificationToUser(userId, {
       ...savedNotification,
       type: "BADGE_EARNED",
     });
@@ -129,7 +141,7 @@ export class NotificationsService {
 
   async sendCollaborationInvite(data: any) {
     const notification = this.notificationRepository.create({
-      userId: data.userId, // Use userId instead of artistId
+      userId: data.userId,
       type: NotificationType.COLLABORATION_INVITE,
       title: "New Collaboration Invite",
       message: `${data.invitedBy} invited you to collaborate on "${data.trackTitle}"`,
@@ -144,10 +156,9 @@ export class NotificationsService {
     const savedNotification =
       await this.notificationRepository.save(notification);
 
-    // Emit via WebSocket
     if (this.notificationsGateway) {
-      this.notificationsGateway.sendNotificationToArtist(
-        data.userId, // Use userId instead of artistId
+      this.notificationsGateway.sendNotificationToUser(
+        data.userId,
         savedNotification,
       );
     }
@@ -157,7 +168,7 @@ export class NotificationsService {
 
   async sendCollaborationResponse(data: any) {
     const notification = this.notificationRepository.create({
-      userId: data.userId, // Use userId instead of artistId
+      userId: data.userId,
       type: NotificationType.COLLABORATION_RESPONSE,
       title: `Collaboration ${data.status === "approved" ? "Accepted" : "Declined"}`,
       message: `${data.collaboratorName} ${data.status === "approved" ? "accepted" : "declined"} collaboration on "${data.trackTitle}"`,
@@ -171,10 +182,9 @@ export class NotificationsService {
     const savedNotification =
       await this.notificationRepository.save(notification);
 
-    // Emit via WebSocket
     if (this.notificationsGateway) {
-      this.notificationsGateway.sendNotificationToArtist(
-        data.userId, // Use userId instead of artistId
+      this.notificationsGateway.sendNotificationToUser(
+        data.userId,
         savedNotification,
       );
     }

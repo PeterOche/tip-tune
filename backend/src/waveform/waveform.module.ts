@@ -9,6 +9,7 @@ import { WaveformController } from "./waveform.controller";
 import { WaveformGeneratorService } from "./waveform-generator.service";
 import { WaveformProcessor } from "./waveform.processor";
 import { TracksModule } from "../tracks/tracks.module";
+import { QueueModule } from "../queue/queue.module";
 import { WAVEFORM_QUEUE } from "./waveform.constants";
 
 @Module({
@@ -28,6 +29,7 @@ import { WAVEFORM_QUEUE } from "./waveform.constants";
       }),
     }),
     TracksModule,
+    QueueModule,
   ],
   controllers: [WaveformController],
   providers: [

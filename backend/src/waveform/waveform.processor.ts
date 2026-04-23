@@ -5,6 +5,7 @@ import { Job } from 'bullmq';
 import { WaveformGeneratorService } from './waveform-generator.service';
 import { WaveformService, WaveformJobPayload } from './waveform.service';
 import { WAVEFORM_JOBS, WAVEFORM_QUEUE } from './waveform.constants';
+import { DlqService } from '../queue/dlq.service';
 
 /**
  * BullMQ worker that processes waveform generation jobs.
@@ -16,6 +17,7 @@ export class WaveformProcessor extends WorkerHost {
   constructor(
     private readonly generatorService: WaveformGeneratorService,
     private readonly waveformService: WaveformService,
+    private readonly dlqService: DlqService,
   ) {
     super();
   }
@@ -53,6 +55,19 @@ export class WaveformProcessor extends WorkerHost {
           message,
           job.attemptsMade + 1,
         );
+
+        // Move to DLQ for manual inspection and replay
+        await this.dlqService.createEntry({
+          jobType: WAVEFORM_JOBS.GENERATE,
+          jobId: job.id,
+          payload: job.data,
+          lastError: message,
+          retryCount: job.attemptsMade,
+          recoveryMetadata: {
+            trackId,
+            exhaustedAt: new Date().toISOString(),
+          },
+        });
       }
 
       // Re-throw so BullMQ applies exponential back-off on non-final attempts
